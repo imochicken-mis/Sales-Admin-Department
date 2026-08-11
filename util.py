@@ -23,7 +23,11 @@ def authenticate(username, password):
 
 def get_allowed_pages(role):
     if role == "admin":
+<<<<<<< Updated upstream
         return ["Requrement", "dashboard","rep_target"]
+=======
+        return ["Requirement", "dashboard","rep_target","2Cash_Collection_and_Deposit_Report"]
+>>>>>>> Stashed changes
     if role in ["user1"]:
         return ["1sales_day_book","2Inventory","3Monthly_Forecast","4Working_days","5Rep_Target"]
     if role in ["user2","user3"]:
