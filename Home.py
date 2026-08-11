@@ -512,13 +512,8 @@ def main():
         return clean_name.replace("_", " ").title()
     
     kpi_pages = [p for p in page_options if p in ["Home"]]
-<<<<<<< Updated upstream
-    data_entry_pages = [p for p in page_options if p in ["1sales_day_book" , "2Inventory", "3Monthly_Forecast", "4Working_days", "5Rep_Target"]]
-    report_pages = [p for p in page_options if p in ["Requrement", "rep_target"]]
-=======
     data_entry_pages = [p for p in page_options if p in ["1sales_day_book" , "2Inventory", "3Monthly_Forecast", "4Working_days", "5Rep_Target","1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation"]]
     report_pages = [p for p in page_options if p in ["Requirement", "rep_target","2Cash_Collection_and_Deposit_Report"]]
->>>>>>> Stashed changes
     dashboard_pages = [p for p in page_options if p in ["dashboard"]]
 
     def nav_callback(radio_key):
