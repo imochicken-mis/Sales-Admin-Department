@@ -8,14 +8,33 @@ from google.oauth2.service_account import Credentials
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-USERS = {
-    "user1": {"password_hash": hash_password("pass1"), "role": "user1"},
-    "user2": {"password_hash": hash_password("pass2"), "role": "user2"},
-    "user3": {"password_hash": hash_password("pass3"), "role": "user3"},
-    "admin": {"password_hash": hash_password("adminpass"), "role": "admin"}
-}
+@st.cache_data(ttl=600, show_spinner=False)
+def get_users_from_sheet():
+    try:
+        # ඔයාගේ Sheet connection function එක මෙතනට දෙන්න (උදා: connect_to_sheets)
+        sh = connect_to_sheets() 
+        ws = sh.worksheet("User_Accounts") # අලුතින් හදපු Sheet එකේ නම
+        records = ws.get_all_records(default_blank="")
+        
+        users_dict = {}
+        for row in records:
+            username = str(row.get("Username", "")).strip()
+            password = str(row.get("Password", "")).strip()
+            role = str(row.get("Role", "")).strip()
+            
+            # Username සහ Password හිස් නැත්නම් පමණක් ඇතුළත් කරගන්න
+            if username and password:
+                users_dict[username] = {
+                    "password_hash": hash_password(password), # මෙතනදී Password එක Hash වෙනවා
+                    "role": role
+                }
+        return users_dict
+    except Exception as e:
+        st.error(f"⚠️ Error loading user accounts from sheet: {e}")
+        return {}
 
 def authenticate(username, password):
+    USERS = get_users_from_sheet()
     if username in USERS:
         if USERS[username]["password_hash"] == hash_password(password):
             return USERS[username]["role"]
@@ -28,6 +47,8 @@ def get_allowed_pages(role):
         return ["1sales_day_book","2Inventory","3Monthly_Forecast","4Working_days","5Rep_Target"]
     if role in ["user2","user3"]:
         return ["1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation"]
+    if role in ["admin1"]:
+            return ["Settings"]
     return []
 
 # ---------- Google Sheets Connection ----------

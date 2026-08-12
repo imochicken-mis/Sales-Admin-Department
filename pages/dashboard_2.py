@@ -52,8 +52,27 @@ def apply_custom_css():
             min-height: 85vh !important;
         }
 
-        div[data-testid="stDateInput"] div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
-            border: 2px solid var(--c-900) !important;
+        /* 🚀 Date Input සහ Selectbox සඳහා නිල් පාට Border එක (Blue Border Fix) */
+        div[data-testid="stDateInput"] label p, div[data-testid="stSelectbox"] label p {
+            font-family: 'Arial', sans-serif !important;
+            font-weight: 800 !important;
+            font-size: 15px !important;
+            color: #03045E !important;
+        }
+        
+        div[data-testid="stDateInput"] div[data-baseweb="input"], 
+        div[data-testid="stSelectbox"] div[data-baseweb="select"] {
+            border: 2px solid #0096C7 !important; /* light blue border */
+            border-radius: 8px !important;        /* boarder radious */
+            background-color: #F8FDFF !important; /* white bg */
+            transition: all 0.3s ease-in-out;
+            padding-left: 5px;
+        }
+
+        /* Click කළ විට (Focus වෙද්දී) තද නිල් පාට වීම */
+        div[data-testid="stDateInput"] div[data-baseweb="input"]:focus-within, 
+        div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within {
+            border: 2px solid #03045E !important;
             box-shadow: 0 0 8px rgba(3, 4, 94, 0.4) !important;
         }
 
@@ -380,7 +399,7 @@ def show():
     
     col1, col2, col3 = st.columns([1, 1, 1], vertical_alignment="bottom")
     with col1:
-        start_date = st.date_input("Start Date:", value=min_db_date)
+        start_date = st.date_input("Start Date:", value=first_day)
     with col2:
         end_date = st.date_input("End Date:", value=today)
     with col3:
@@ -396,6 +415,17 @@ def show():
     start_ts = pd.Timestamp(start_date)
     end_ts = pd.Timestamp(end_date)
     
+    # 🚀 1. Check for valid dates and show latest snapshot info
+    valid_dates = df[df["Parsed_Date"].dt.date <= end_date]["Parsed_Date"]
+    
+    if valid_dates.empty:
+        st.warning(f"No collection records found on or before {end_date.strftime('%Y-%m-%d')}.")
+        return
+        
+    latest_date = valid_dates.max()
+    if latest_date.date() != end_date:
+        st.info(f"💡 Showing latest snapshot up to **{latest_date.strftime('%Y-%m-%d')}**")
+
     # Date Filtered Data
     df_date_filtered = df[(df["Parsed_Date"] >= start_ts) & (df["Parsed_Date"] <= end_ts)].copy()
     
@@ -547,6 +577,7 @@ def show():
             # 🚀 1. Column එක ඇතුළට Data Label එක දැමීම (සුදු පාටින්)
             text=rep_perf[tot_col_name].apply(lambda x: f"{x/1000:,.0f}k" if x > 0 else ""),
             textposition="inside",
+            insidetextanchor="start",
             textfont=dict(color="white", size=12, family="Arial Black")
         ))
         

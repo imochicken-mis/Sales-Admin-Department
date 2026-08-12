@@ -877,8 +877,8 @@ def show():
                     tiling=dict(packing="squarify", pad=2) # 🚀 කොටු අතර පොඩි ඉඩක් තැබීම
                 ))
                 
-                fig_tree = apply_plotly_layout(fig_tree, f"Hierarchy Performance ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})")
-                
+                fig_tree = apply_plotly_layout(fig_tree, f"Hierarchy Performance ({start_date.strftime('%Y-%m-%d')} to {latest_date.strftime('%Y-%m-%d')})")
+            
                 fig_tree.update_layout(
                     height=850, # 🚀 ඉඩ මදි නිසා උස 850 දක්වා ගොඩක් වැඩි කළා
                     margin=dict(t=90, l=10, r=10, b=20)

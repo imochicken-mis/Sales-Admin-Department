@@ -509,8 +509,12 @@ def main():
             return "KPI" # For Home page, display as "KPI"
         if name == "dashboard":
             return "Production Requirement" # For dashboard page, display as "Production requirement"
+        if name == "Requirement":
+            return "Production Requirement  "
         if name == "1DSR_Report":
             return "DSR Report"
+        if name == "dashboard_2":
+            return "Cash Collection"
 
         # clear the unusefull 
         clean_name = re.sub(r'^[\d_]+', '', name)
@@ -520,6 +524,7 @@ def main():
     data_entry_pages = [p for p in page_options if p in ["1sales_day_book" , "2Inventory", "3Monthly_Forecast", "4Working_days", "5Rep_Target","1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation"]]
     report_pages = [p for p in page_options if p in ["Requirement", "rep_target","2Cash_Collection_and_Deposit_Report"]]
     dashboard_pages = [p for p in page_options if p in ["dashboard","dashboard_2"]]
+    settings_pages = [p for p in page_options if p in ["Settings"]]
 
     def nav_callback(radio_key):
         if st.session_state[radio_key] is not None:
@@ -529,6 +534,7 @@ def main():
     st.session_state["data_entry_radio"] = st.session_state.current_page if st.session_state.current_page in data_entry_pages else None
     st.session_state["report_radio"] = st.session_state.current_page if st.session_state.current_page in report_pages else None
     st.session_state["dashboard_radio"] = st.session_state.current_page if st.session_state.current_page in dashboard_pages else None
+    st.session_state["settings_radio"] = st.session_state.current_page if st.session_state.current_page in settings_pages else None
 
 
     if kpi_pages:
@@ -583,6 +589,19 @@ def main():
             key="dashboard_radio",
             on_change=nav_callback,
             args=("dashboard_radio",),
+            label_visibility="collapsed"
+        )
+
+    if settings_pages:
+        st.sidebar.markdown("### Settings")
+        st.sidebar.radio(
+            "Setting Navigation",
+            settings_pages,
+            index=settings_pages.index(st.session_state.current_page) if st.session_state.current_page in settings_pages else None,
+            format_func=format_page_name,
+            key="settings_radio",
+            on_change=nav_callback,
+            args=("settings_radio",),
             label_visibility="collapsed"
         )
 
