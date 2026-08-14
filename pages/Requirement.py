@@ -468,25 +468,41 @@ def show():
         
         options = {
             'page-size': 'A4', 'orientation': 'Landscape', 'margin-top': '0.3in', 'margin-right': '0.3in',
-            'margin-bottom': '0.3in', 'margin-left': '0.3in', 'encoding': "UTF-8", 'enable-local-file-access': None,
-            'zoom': 1.0, 'dpi': 300, 'no-outline': None
+            'margin-bottom': '0.3in', 'margin-left': '0.3in', 'encoding': "UTF-8", 'enable-local-file-access': None
         }
-        
-        if pdfkit:
+
+        import platform
+        import streamlit as st
+
+        if platform.system() == "Windows":
+            # 💻 Local Windows පරිගණකය සඳහා (pdfkit)
             try:
-                config = None
-                # 🚀 Windows සඳහා wkhtmltopdf path configuration
-                if platform.system() == "Windows":
-                    path_wkhtmltopdf = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
-                    config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
-                    
+                import pdfkit
+                path_wkhtmltopdf = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
+                config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
+                
                 pdf_bytes = pdfkit.from_string(html_content, False, options=options, configuration=config)
                 return pdf_bytes, "pdf", "application/pdf"
-            except Exception as e: 
-                st.error(f"⚠️ PDF Error: {e}") 
+            except Exception as e:
+                st.error(f"⚠️ Local PDF Error: {e}") 
         else:
-            st.error("⚠️ 'pdfkit' library is not installed!")
-            
+            # ☁️ Streamlit Cloud සර්වර් එක සඳහා (xhtml2pdf)
+            try:
+                from xhtml2pdf import pisa
+                from io import BytesIO
+                result = BytesIO()
+                
+                # Cloud එකේදී PDF එක සෑදීම
+                pisa_status = pisa.CreatePDF(BytesIO(html_content.encode("utf-8")), dest=result)
+                
+                if not pisa_status.err:
+                    return result.getvalue(), "pdf", "application/pdf"
+                else:
+                    st.error("⚠️ Cloud PDF Generation failed.")
+            except Exception as e:
+                st.error(f"⚠️ Cloud PDF Error: {e}")
+
+        # Fallback (PDF එක හැදුනේ නැත්නම් HTML එක දෙනවා)
         return html_content.encode('utf-8'), "html", "text/html"
 
     # ============================================================

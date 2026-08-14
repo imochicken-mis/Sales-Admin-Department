@@ -12,3 +12,4 @@ matplotlib
 sqlalchemy
 psycopg2-binary
 pdfkit
+xhtml2pdf
