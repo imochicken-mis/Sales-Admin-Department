@@ -4,6 +4,7 @@ import re
 import time
 import base64
 import datetime
+import platform
 import gspread
 import numpy as np
 import pandas as pd
@@ -148,7 +149,6 @@ def show():
         balance["Balance"] = balance["Qty"] - balance["Forecast Qty"]
         balance = balance.drop(columns=["Item Name", "Qty", "Forecast Qty"])
 
-        # --- NEW: Inventory column (from Sales data -> Inventory tab, filtered by selected date) ---
         inventory_col = sale_qty.copy().merge(
             forecast_filtered[["Product Code", "Forecast Qty"]], on="Product Code", how="left"
         )
@@ -160,7 +160,6 @@ def show():
         inventory_col["Inventory"] = inv_avail_for_col.reindex(inventory_col.index).fillna(0)
         inventory_col = inventory_col.reset_index().drop(columns=["Item Name", "Qty", "Forecast Qty"])
 
-        # --- NEW: Buffer Level = (Forecast Qty / Working Days) * 6 ---
         buffer_level = sale_qty.copy().merge(
             forecast_filtered[["Product Code", "Forecast Qty"]], on="Product Code", how="left"
         )
@@ -239,6 +238,15 @@ def show():
         )
 
         master_table = master_table.replace([np.inf, -np.inf], 0)
+        
+        # 🚀 නව තීරු නම් (Column Names) වෙනස් කිරීම
+        master_table = master_table.rename(columns={
+            "Qty": "Sale Qty",
+            "forecast_achivement %": "Forecast Achievement %",
+            "avg sale per week": "Avg sale per week",
+            "avilable balance": "Avilable Balance"
+        })
+        
         return master_table
 
     def build_weekly_breakdown(selected_date_str: str, items_master: pd.DataFrame) -> pd.DataFrame:
@@ -326,51 +334,56 @@ def show():
         if not is_weekly:
             def highlight_rows(row):
                 styles = [''] * len(row)
-                if 'forecast_achivement %' in row.index:
-                    ach_idx = row.index.get_loc('forecast_achivement %')
-                    ach_val = safe_get_float(row['forecast_achivement %'])
+                # 🚀 'Forecast Achievement %' ලෙස නම වෙනස් කර ඇත
+                if 'Forecast Achievement %' in row.index:
+                    ach_idx = row.index.get_loc('Forecast Achievement %')
+                    ach_val = safe_get_float(row['Forecast Achievement %'])
                     if ach_val is not None:
-                        if ach_val >= 100: styles[ach_idx] = 'background-color: #D4EDDA; color: #155724; font-weight: bold;'
-                        elif ach_val >= 75: styles[ach_idx] = 'background-color: #FFF3CD; color: #856404; font-weight: bold;'
-                        elif ach_val >= 50: styles[ach_idx] = 'background-color: #FFE8CC; color: #A04000; font-weight: bold;'
-                        elif ach_val >= 0: styles[ach_idx] = 'background-color: #F8D7DA; color: #721C24; font-weight: bold;'
-                        else: styles[ach_idx] = 'background-color: #F5C6CB; color: #721C24; font-weight: bold;'
+                        if ach_val >= 100: styles[ach_idx] = 'background-color: #D4EDDA !important; color: #155724 !important; font-weight: bold;'
+                        elif ach_val >= 75: styles[ach_idx] = 'background-color: #FFF3CD !important; color: #856404 !important; font-weight: bold;'
+                        elif ach_val >= 50: styles[ach_idx] = 'background-color: #FFE8CC !important; color: #A04000 !important; font-weight: bold;'
+                        elif ach_val >= 0: styles[ach_idx] = 'background-color: #F8D7DA !important; color: #721C24 !important; font-weight: bold;'
+                        else: styles[ach_idx] = 'background-color: #F5C6CB !important; color: #721C24 !important; font-weight: bold;'
                 
                 if 'Average Daily Target' in row.index:
                     adt_idx = row.index.get_loc('Average Daily Target')
                     adt_val = safe_get_float(row['Average Daily Target'])
                     if adt_val is not None:
-                        if adt_val >= 100: styles[adt_idx] = 'background-color: #D4EDDA; color: #155724; font-weight: bold;'
-                        elif adt_val >= 75: styles[adt_idx] = 'background-color: #FFF3CD; color: #856404; font-weight: bold;'
-                        elif adt_val >= 50: styles[adt_idx] = 'background-color: #FFE8CC; color: #A04000; font-weight: bold;'
-                        elif adt_val >= 0: styles[adt_idx] = 'background-color: #F8D7DA; color: #721C24; font-weight: bold;'
-                        else: styles[adt_idx] = 'background-color: #F5C6CB; color: #721C24; font-weight: bold;'
+                        if adt_val >= 100: styles[adt_idx] = 'background-color: #D4EDDA !important; color: #155724 !important; font-weight: bold;'
+                        elif adt_val >= 75: styles[adt_idx] = 'background-color: #FFF3CD !important; color: #856404 !important; font-weight: bold;'
+                        elif adt_val >= 50: styles[adt_idx] = 'background-color: #FFE8CC !important; color: #A04000 !important; font-weight: bold;'
+                        elif adt_val >= 0: styles[adt_idx] = 'background-color: #F8D7DA !important; color: #721C24 !important; font-weight: bold;'
+                        else: styles[adt_idx] = 'background-color: #F5C6CB !important; color: #721C24 !important; font-weight: bold;'
                 
                 if 'Balance' in row.index:
                     bal_idx = row.index.get_loc('Balance')
                     bal_val = safe_get_float(row['Balance'])
                     if bal_val is not None:
-                        if bal_val >= 0: styles[bal_idx] = 'background-color: #E2F0CB; color: #2D5A27; font-weight: bold;'
-                        else: styles[bal_idx] = 'background-color: #FFD1D1; color: #900000; font-weight: bold;'
+                        if bal_val >= 0: styles[bal_idx] = 'background-color: #E2F0CB !important; color: #2D5A27 !important; font-weight: bold;'
+                        else: styles[bal_idx] = 'background-color: #FFD1D1 !important; color: #900000 !important; font-weight: bold;'
                 
-                if 'Qty' in row.index and 'Forecast Qty' in row.index:
-                    qty_idx = row.index.get_loc('Qty')
-                    qty_val = safe_get_float(row['Qty'])
+                # 🚀 'Sale Qty' ලෙස නම වෙනස් කර ඇත
+                if 'Sale Qty' in row.index and 'Forecast Qty' in row.index:
+                    qty_idx = row.index.get_loc('Sale Qty')
+                    qty_val = safe_get_float(row['Sale Qty'])
                     fq_val = safe_get_float(row['Forecast Qty'])
                     if qty_val is not None and fq_val is not None and fq_val > 0:
                         pct = (qty_val / fq_val) * 100
-                        if pct >= 100: styles[qty_idx] = 'background-color: #D4EDDA; color: #155724; font-weight: bold;'
-                        elif pct >= 75: styles[qty_idx] = 'background-color: #FFF3CD; color: #856404; font-weight: bold;'
-                        elif pct >= 50: styles[qty_idx] = 'background-color: #FFE8CC; color: #A04000; font-weight: bold;'
-                        elif pct >= 0: styles[qty_idx] = 'background-color: #F8D7DA; color: #721C24; font-weight: bold;'
-                        else: styles[qty_idx] = 'background-color: #F5C6CB; color: #721C24; font-weight: bold;'
+                        if pct >= 100: styles[qty_idx] = 'background-color: #D4EDDA !important; color: #155724 !important; font-weight: bold;'
+                        elif pct >= 75: styles[qty_idx] = 'background-color: #FFF3CD !important; color: #856404 !important; font-weight: bold;'
+                        elif pct >= 50: styles[qty_idx] = 'background-color: #FFE8CC !important; color: #A04000 !important; font-weight: bold;'
+                        elif pct >= 0: styles[qty_idx] = 'background-color: #F8D7DA !important; color: #721C24 !important; font-weight: bold;'
+                        else: styles[qty_idx] = 'background-color: #F5C6CB !important; color: #721C24 !important; font-weight: bold;'
                 return styles
             styler = styler.apply(highlight_rows, axis=1)
 
+        # 🚀 Table Heading වලට තද නිල් පසුබිමක් සහ සුදු අකුරු ලබාදීම (Web සහ PDF)
         styler = styler.set_table_styles([
-            {'selector': 'th', 'props': [('background-color', '#03045E'), ('color', 'white'), ('text-align', 'center'), ('padding', '10px'), ('border', '1px solid #ADE8F4'), ('white-space', 'nowrap')]},
+            {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse')]},
+            {'selector': 'th', 'props': [('background-color', '#00245E'), ('color', '#FFFFFF'), ('text-align', 'center'), ('padding', '10px'), ('border', '1px solid #ADE8F4'), ('white-space', 'nowrap')]},
             {'selector': 'td', 'props': [('border', '1px solid #ADE8F4'), ('padding', '8px'), ('text-align', 'right'), ('white-space', 'nowrap')]},
-            {'selector': 'tr:nth-child(even)', 'props': [('background-color', '#F8FDFF')]}
+            {'selector': 'tr:nth-child(even)', 'props': [('background-color', '#F8FDFF')]},
+            {'selector': 'tr:nth-child(odd)', 'props': [('background-color', '#FFFFFF')]}
         ])
         
         try: styler = styler.hide(axis="index")
@@ -399,11 +412,22 @@ def show():
                 body {{ font-family: 'Helvetica', 'Arial', sans-serif; color: #03045E; margin: 0; background-color: #ffffff; }}
                 table.header-table {{ width: 100%; background-color: #00245E; color: white; border-bottom: 5px solid #DE9C40; border-radius: 8px 8px 0 0; margin-bottom: 15px; border-collapse: collapse; }}
                 table.header-table td {{ border: none; padding: 15px; background-color: #00245E; text-align: left; vertical-align: middle; }}
-                .info-section {{ background-color: #CAF0F8; padding: 12px 20px; border-left: 6px solid #0096C7; margin-bottom: 15px; border-radius: 4px; }}
-                .info-section h3 {{ margin: 0; color: #023E8A; font-size: 14px; }}
-                table {{ width: 100%; border-collapse: collapse; font-size: 11px !important; table-layout: auto; }}
-                th, td {{ border: 1px solid #ADE8F4; padding: 6px 8px; text-align: right; white-space: nowrap; }}
-                th {{ background-color: #03045E !important; color: white !important; text-align: center; font-weight: bold; }}
+                .info-section {{ background-color: #CAF0F8; padding: 15px 20px; border-left: 6px solid #0096C7; margin-bottom: 15px; border-radius: 4px; }}
+                
+                /* 🚀 PDF Headers විශාල කිරීම */
+                .info-section h3 {{ margin: 0; color: #023E8A; font-size: 18px; }}
+                
+                /* 🚀 PDF Data Table Styles — table-layout: fixed keeps the table locked to
+                   100% of the page width so no column (especially the last one) ever gets
+                   cropped; long text wraps onto a 2nd line instead of pushing the table wider. */
+                table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 10px !important; table-layout: fixed; margin-top: 10px; font-family: 'Arial', sans-serif; }}
+                table.dataframe th, table.dataframe td {{ border: 1px solid #ADE8F4 !important; padding: 6px 5px; text-align: right; white-space: normal !important; word-wrap: break-word; overflow-wrap: break-word; }}
+                table.dataframe th {{ background-color: #00245E !important; color: white !important; text-align: center !important; font-weight: bold; }}
+                table.dataframe tbody tr:nth-child(even) {{ background-color: #F8FDFF !important; }}
+                table.dataframe tbody tr:nth-child(odd) {{ background-color: #FFFFFF !important; }}
+                
+                /* Ensure Background Colors Print */
+                * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }}
             </style>
         </head>
         <body>
@@ -416,20 +440,27 @@ def show():
             <div class="info-section">
                 <table style="width: 100%; border: none;">
                     <tr>
-                        <td style="text-align: left; border: none; padding: 0;"><h3>Department: Sales & Admin</h3></td>
+                        <td style="text-align: left; border: none; padding: 0;"><h3>Department: Sales & Marketing</h3></td>
                         <td style="text-align: center; border: none; padding: 0;"><h3>Report: {title}</h3></td>
                         <td style="text-align: right; border: none; padding: 0;"><h3>Date: {date_str}</h3></td>
                     </tr>
                 </table>
             </div>
-            <div style="display: flex; gap: 15px; margin-bottom: 10px; font-size: 11px; font-weight: bold; justify-content: flex-end; color: #03045E;">
-                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #D4EDDA; border: 1px solid #155724;"></div> Target &ge; 100%</div>
-                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #FFF3CD; border: 1px solid #856404;"></div> 75% - 99%</div>
-                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #FFE8CC; border: 1px solid #A04000;"></div> 50% - 74%</div>
-                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #F8D7DA; border: 1px solid #721C24;"></div> &lt; 50%</div>
-                <div style="display: flex; align-items: center; gap: 5px; margin-left:10px;"><div style="width: 12px; height: 12px; background-color: #E2F0CB; border: 1px solid #2D5A27;"></div> Balance &ge; 0</div>
-                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #FFD1D1; border: 1px solid #900000;"></div> Balance &lt; 0</div>
-            </div>
+            
+            <!-- 🚀 PDF එකේ වර්ණ වල තේරුම (Legend) නිවැරදිව පෙන්වීමට Table එකක් යොදා ගැනීම -->
+            <table style="width: 100%; border: none; margin-bottom: 15px; font-size: 14px; font-weight: bold; color: #03045E;">
+                <tr>
+                    <td style="text-align: right; border: none; padding: 0;">
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #D4EDDA; border: 1px solid #155724; vertical-align: middle;"></span><span style="vertical-align: middle;"> Target &ge; 100% &nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #FFF3CD; border: 1px solid #856404; vertical-align: middle;"></span><span style="vertical-align: middle;"> 75% - 99% &nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #FFE8CC; border: 1px solid #A04000; vertical-align: middle;"></span><span style="vertical-align: middle;"> 50% - 74% &nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #F8D7DA; border: 1px solid #721C24; vertical-align: middle;"></span><span style="vertical-align: middle;"> &lt; 50% &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #E2F0CB; border: 1px solid #2D5A27; vertical-align: middle;"></span><span style="vertical-align: middle;"> Balance &ge; 0 &nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #FFD1D1; border: 1px solid #900000; vertical-align: middle;"></span><span style="vertical-align: middle;"> Balance &lt; 0</span>
+                    </td>
+                </tr>
+            </table>
+            
             {styler.to_html()}
         </body>
         </html>
@@ -443,10 +474,19 @@ def show():
         
         if pdfkit:
             try:
-                pdf_bytes = pdfkit.from_string(html_content, False, options=options)
+                config = None
+                # 🚀 Windows සඳහා wkhtmltopdf path configuration
+                if platform.system() == "Windows":
+                    path_wkhtmltopdf = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
+                    config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
+                    
+                pdf_bytes = pdfkit.from_string(html_content, False, options=options, configuration=config)
                 return pdf_bytes, "pdf", "application/pdf"
-            except Exception: pass 
-        
+            except Exception as e: 
+                st.error(f"⚠️ PDF Error: {e}") 
+        else:
+            st.error("⚠️ 'pdfkit' library is not installed!")
+            
         return html_content.encode('utf-8'), "html", "text/html"
 
     # ============================================================
@@ -598,8 +638,11 @@ def show():
     # ============================================================
     # 5. STREAMLIT UI
     # ============================================================
-    st.set_page_config(page_title="Requirement Report", layout="wide")
-    
+    try:
+        st.set_page_config(page_title="Requirement Report", layout="wide")
+    except:
+        pass
+        
     st.markdown("""
         <style>
         :root {
@@ -649,11 +692,58 @@ def show():
         div.element-container:has(.cancel-target) + div.element-container button:hover {
             background-color: #218838 !important; border: 1px solid #218838 !important; color: white !important;
         }
+
+        /* 🚀 අලුත් Table CSS එක (UI එකට) */
+        .table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 2px solid #0096C7;
+            box-shadow: 0 8px 24px rgba(3, 4, 94, 0.1);
+            background-color: #FFFFFF;
+            margin-bottom: 15px;
+        }
+        .table-container::-webkit-scrollbar { width: 8px; height: 8px; }
+        .table-container::-webkit-scrollbar-track { background: transparent; }
+        .table-container::-webkit-scrollbar-thumb { background: #0096C7; border-radius: 10px; }
+        
+        .table-container table {
+            width: 100%;
+            border-collapse: separate !important;
+            border-spacing: 0;
+            font-family: 'Arial', sans-serif;
+            font-size: 13px;
+        }
+        .table-container th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            padding: 12px 8px;
+            text-align: center !important;
+            color: #FFFFFF !important;
+            font-weight: 900;
+            background-color: #00245e !important;
+            border-bottom: 2px solid #0077B6 !important;
+            border-right: 1px solid #0077B6 !important;
+        }
+        .table-container td {
+            border-bottom: 1px solid #ADE8F4 !important;
+            border-right: 1px solid #ADE8F4 !important;
+            padding: 10px 8px;
+            white-space: nowrap;
+        }
+        .table-container th:last-child, .table-container td:last-child { border-right: none !important; }
+        .table-container tbody tr:hover td {
+            background-color: #EAF8FF !important;
+            transition: 0.2s;
+        }
         </style>
     """, unsafe_allow_html=True)
 
     st.title("Production Requirement Report")
     
+    # 🚀 වෙනස: ඉහළින් Date Picker එක පමණක් පෙන්වීම
     col1, col2 = st.columns([2, 5], vertical_alignment="bottom")
     with col1:
         selected_date = st.date_input("Select Date:", value=datetime.date.today())
@@ -676,23 +766,27 @@ def show():
         st.info(f"✅ A previously generated report already exists for **{selected_date_str}**.")
         
         existing_df = enforce_numeric_types(existing_df)
+        existing_df = existing_df.drop(columns=["Date"], errors="ignore")
         
+        # 🚀 Web App එකේ Legend එක ලොකු කිරීම
         st.markdown("""
-        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 12px; font-size: 14px; font-weight: 600; color: #03045E; background: white; padding: 10px; border-radius: 6px; border: 1px solid #D1E5EB;">
-            <span style="color: #666;">Targets:</span>
-            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 16px; height: 16px; background-color: #D4EDDA; border: 1px solid #155724; border-radius: 4px;"></div> &ge; 100%</div>
-            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 16px; height: 16px; background-color: #FFF3CD; border: 1px solid #856404; border-radius: 4px;"></div> 75% - 99%</div>
-            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 16px; height: 16px; background-color: #FFE8CC; border: 1px solid #A04000; border-radius: 4px;"></div> 50% - 74%</div>
-            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 16px; height: 16px; background-color: #F8D7DA; border: 1px solid #721C24; border-radius: 4px;"></div> &lt; 50%</div>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px; font-size: 16px; font-weight: 600; color: #03045E; background: white; padding: 12px; border-radius: 6px; border: 1px solid #D1E5EB;">
+            <span style="color: #666; font-size: 16px;">Targets:</span>
+            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 18px; height: 18px; background-color: #D4EDDA; border: 1px solid #155724; border-radius: 4px;"></div> &ge; 100%</div>
+            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 18px; height: 18px; background-color: #FFF3CD; border: 1px solid #856404; border-radius: 4px;"></div> 75% - 99%</div>
+            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 18px; height: 18px; background-color: #FFE8CC; border: 1px solid #A04000; border-radius: 4px;"></div> 50% - 74%</div>
+            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 18px; height: 18px; background-color: #F8D7DA; border: 1px solid #721C24; border-radius: 4px;"></div> &lt; 50%</div>
             <span style="color: #ccc; margin: 0 10px;">|</span>
-            <span style="color: #666;">Balance:</span>
-            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 16px; height: 16px; background-color: #E2F0CB; border: 1px solid #2D5A27; border-radius: 4px;"></div> &ge; 0 (Good)</div>
-            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 16px; height: 16px; background-color: #FFD1D1; border: 1px solid #900000; border-radius: 4px;"></div> &lt; 0 (Short)</div>
+            <span style="color: #666; font-size: 16px;">Balance:</span>
+            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 18px; height: 18px; background-color: #E2F0CB; border: 1px solid #2D5A27; border-radius: 4px;"></div> &ge; 0 (Good)</div>
+            <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 18px; height: 18px; background-color: #FFD1D1; border: 1px solid #900000; border-radius: 4px;"></div> &lt; 0 (Short)</div>
         </div>
         """, unsafe_allow_html=True)
         
         styled_master = style_dataframe(existing_df, is_weekly=False)
-        st.dataframe(styled_master, use_container_width=True)
+        
+        # 🚀 Use custom HTML wrapper instead of st.dataframe
+        st.markdown(f"<div class='table-container'>{styled_master.to_html()}</div>", unsafe_allow_html=True)
         
         c1, c2 = st.columns(2)
         with c1:
@@ -706,8 +800,11 @@ def show():
             st.divider()
             st.subheader(f"Weekly Breakdown — {pd.to_datetime(selected_date_str).strftime('%B %Y')}")
             existing_weekly = enforce_numeric_types(existing_weekly)
+            existing_weekly = existing_weekly.drop(columns=["Month"], errors="ignore")
             styled_weekly = style_dataframe(existing_weekly, is_weekly=True)
-            st.dataframe(styled_weekly, use_container_width=True)
+            
+            # 🚀 Use custom HTML wrapper for weekly breakdown too
+            st.markdown(f"<div class='table-container'>{styled_weekly.to_html()}</div>", unsafe_allow_html=True)
 
             wc1, wc2 = st.columns(2)
             with wc1:
@@ -740,10 +837,12 @@ def show():
                     st.rerun()
 
     else:
+        # 🚀 වෙනස: Report එකක් නැති විට පහළින් එකම බොත්තමක් පෙන්වීම
         st.info("No report exists for the selected date. Click the button below to generate and save one.")
         if st.button("▶ Calculate & Save Report", type="primary"):
             with st.spinner("Calculating and Saving to Database..."):
                 try:
+                    clear_raw_cache()
                     _, sales_day_book, _, _, _ = load_raw_data()
                     date_col = (
                         "New_date" if "New_date" in sales_day_book.columns
@@ -773,6 +872,10 @@ def show():
                     save_report_to_sheet(sheet1, master_table, selected_date_str)
                     save_weekly_report_to_sheet(sheet1, weekly_table, selected_month_str)
                     
+                    fetch_existing_reports.clear()
                     save_and_refresh(f"✅ Report for '{selected_date_str}' successfully calculated and saved!")
                 except Exception as e:
                     st.error(f"Error occurred during calculation/saving: {e}")
+
+if __name__ == "__main__":
+    show()

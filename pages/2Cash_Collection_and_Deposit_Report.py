@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 import gspread
 import base64
+import platform
 
 from util import connect_to_sheets
 
@@ -24,20 +25,33 @@ def generate_pdf_or_html(table_html, date_str, kpi_data):
         
     # KPI Section HTML for PDF (HTML Entities used to avoid syntax errors)
     kpi_html = f"""
-    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
-        <div style="flex: 1; background: linear-gradient(135deg, #0077B6 0%, #00245e 100%); padding: 15px; border-radius: 12px; margin-right: 10px; text-align: center; color: white;">
-            <div style="color: #CAF0F8; font-size: 13px; font-weight: bold; text-transform: uppercase;">Total Cash Collection</div>
-            <div style="color: #FFFFFF; font-size: 22px; font-weight: 900; margin-top: 5px;">Rs. {kpi_data['cash']:,.2f}</div>
-        </div>
-        <div style="flex: 1; background: linear-gradient(135deg, #0077B6 0%, #00245e 100%); padding: 15px; border-radius: 12px; margin-right: 10px; text-align: center; color: white;">
-            <div style="color: #E0F7FA; font-size: 13px; font-weight: bold; text-transform: uppercase;">Bank Deposit Amount</div>
-            <div style="color: #FFFFFF; font-size: 22px; font-weight: 900; margin-top: 5px;">Rs. {kpi_data['deposit']:,.2f}</div>
-        </div>
-        <div style="flex: 1; background: linear-gradient(135deg, #2D6A4F 0%, #155724 100%); padding: 15px; border-radius: 12px; text-align: center; color: white;">
-            <div style="color: #D8F3DC; font-size: 13px; font-weight: bold; text-transform: uppercase;">Total Balance</div>
-            <div style="color: #FFFFFF; font-size: 22px; font-weight: 900; margin-top: 5px;">Rs. {kpi_data['balance']:,.2f}</div>
-        </div>
-    </div>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-family: 'Helvetica', 'Arial', sans-serif;">
+        <tr>
+            <!-- Card 1 -->
+            <td style="width: 31%; background-color: #004b87; padding: 18px 10px; border-radius: 10px; text-align: center; color: white; border: 1px solid #004b87;">
+                <div style="color: #CAF0F8; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 6px;">Total Cash Collection</div>
+                <div style="color: #FFFFFF; font-size: 22px; font-weight: 900;">Rs. {kpi_data['cash']:,.2f}</div>
+            </td>
+            
+            <!-- Gap -->
+            <td style="width: 3.5%; background-color: white; border: none;"></td> 
+            
+            <!-- Card 2 -->
+            <td style="width: 31%; background-color: #0060a8; padding: 18px 10px; border-radius: 10px; text-align: center; color: white; border: 1px solid #0060a8;">
+                <div style="color: #E0F7FA; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 6px;">Bank Deposit Amount</div>
+                <div style="color: #FFFFFF; font-size: 22px; font-weight: 900;">Rs. {kpi_data['deposit']:,.2f}</div>
+            </td>
+            
+            <!-- Gap -->
+            <td style="width: 3.5%; background-color: white; border: none;"></td> 
+            
+            <!-- Card 3 -->
+            <td style="width: 31%; background-color: #1e5c34; padding: 18px 10px; border-radius: 10px; text-align: center; color: white; border: 1px solid #1e5c34;">
+                <div style="color: #D8F3DC; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 6px;">Total Balance</div>
+                <div style="color: #FFFFFF; font-size: 22px; font-weight: 900;">Rs. {kpi_data['balance']:,.2f}</div>
+            </td>
+        </tr>
+    </table>
     """
 
     # Full HTML Layout for PDF
@@ -48,12 +62,12 @@ def generate_pdf_or_html(table_html, date_str, kpi_data):
         <meta charset="utf-8">
         <title>Collection Report</title>
         <style>
-            @page {{ size: A4 landscape; margin: 10mm; }}
+            @page {{ size: A4 portrait; margin: 10mm; }}
             body {{ font-family: 'Helvetica', 'Arial', sans-serif; color: #00245e; margin: 0; background-color: #ffffff; }}
             table.header-table {{ width: 100%; background-color: #00245E; color: white; border-bottom: 5px solid #DE9C40; border-radius: 8px 8px 0 0; margin-bottom: 15px; border-collapse: collapse; }}
             table.header-table td {{ border: none; padding: 15px; background-color: #00245E; text-align: left; vertical-align: middle; }}
             .info-section {{ background-color: #CAF0F8; padding: 12px 20px; border-left: 6px solid #0096C7; margin-bottom: 15px; border-radius: 4px; }}
-            .info-section h3 {{ margin: 0; color: #023E8A; font-size: 14px; }}
+            .info-section h3 {{ margin: 0; color: #023E8A; font-size: 18px; }}
             
             /* Table styling for PDF */
             table.report-table {{ width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }}
@@ -76,7 +90,7 @@ def generate_pdf_or_html(table_html, date_str, kpi_data):
             <table style="width: 100%; border: none;">
                 <tr>
                     <td style="text-align: left; border: none; padding: 0;"><h3>Department: Sales & Admin</h3></td>
-                    <td style="text-align: center; border: none; padding: 0;"><h3>Report: Collection Report</h3></td>
+                    <td style="text-align: center; border: none; padding: 0;"><h3>Report: Cash Collection & Deposit</h3></td>
                     <td style="text-align: right; border: none; padding: 0;"><h3>Date: {date_str}</h3></td>
                 </tr>
             </table>
@@ -88,17 +102,28 @@ def generate_pdf_or_html(table_html, date_str, kpi_data):
     """
     
     options = {
-        'page-size': 'A4', 'orientation': 'Landscape', 'margin-top': '0.3in', 'margin-right': '0.3in',
+        'page-size': 'A4', 'orientation': 'Portrait', 'margin-top': '0.3in', 'margin-right': '0.3in',
         'margin-bottom': '0.3in', 'margin-left': '0.3in', 'encoding': "UTF-8", 'enable-local-file-access': None
     }
     
     if pdfkit:
         try:
-            pdf_bytes = pdfkit.from_string(html_content, False, options=options)
+            # Windows සඳහා සොෆ්ට්වෙයාර් එක තියෙන තැන කේතයට ලබා දීම
+            config = None
+            if platform.system() == "Windows":
+                # ඔබ wkhtmltopdf Install කළ තැන වෙනස් නම් මෙතන Path එක වෙනස් කරන්න
+                path_wkhtmltopdf = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
+                config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
+            
+            # config එක සමග PDF එක සෑදීම
+            pdf_bytes = pdfkit.from_string(html_content, False, options=options, configuration=config)
             return pdf_bytes, "pdf", "application/pdf"
+            
         except Exception as e:
-            pass 
-    
+            st.error(f"⚠️ PDF සෑදීමේ දෝෂයක්: {e}") 
+    else:
+        st.error("⚠️ 'pdfkit' library එක install කර නොමැත!")
+        
     return html_content.encode('utf-8'), "html", "text/html"
 
 # ============================================================
@@ -119,14 +144,27 @@ def show():
         
         div[data-testid="stDateInput"] label p, div[data-testid="stSelectbox"] label p {
             font-family: 'Arial', sans-serif !important;
-            font-weight: 800 !important;
-            font-size: 15px !important;
-            color: #00245e !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+            color: #03045E !important;
+        }
+        div[data-testid="stDateInput"] div[data-baseweb="input"] {
+            border: 2px solid #0096C7 !important; 
+            border-radius: 8px !important;        
+            background-color: #F8FDFF !important; 
+            transition: all 0.3s ease-in-out;
+            padding-left: 5px;
         }
         div[data-baseweb="input"], div[data-baseweb="select"] {
             border: 2px solid #0096C7 !important; 
             border-radius: 8px !important;        
             background-color: #F8FDFF !important; 
+        }
+        /* 3. Click කළාම (Focus වෙද්දි) දෙකේම බෝඩරය තද නිල් පාට වීම */
+        div[data-testid="stDateInput"] div[data-baseweb="input"]:focus-within, 
+        div[data-testid="stSelectbox"] div[data-baseweb="select"]:focus-within {
+            border: 2px solid #03045E !important; 
+            box-shadow: 0 0 8px rgba(3, 4, 94, 0.4) !important;
         }
         
         /* Table Container with Scroll & Radius */
@@ -221,10 +259,14 @@ def show():
     # STREAMLIT CHUNK: Rendering Filters...
     col1, col2, col3 = st.columns([1, 1.5, 2.5], vertical_alignment="bottom")
     with col1:
-        selected_date = st.date_input("Filter Date:", value=datetime.date.today())
-        selected_date_str = selected_date.strftime("%Y-%m-%d")
+        if "cc_selected_date" not in st.session_state:
+            st.session_state["cc_selected_date"] = datetime.date.today()
+        selected_date = st.date_input("Select Date:", key="cc_selected_date")
+    selected_date_str = selected_date.strftime("%Y-%m-%d")
     with col2:
-        selected_rep = st.selectbox("Sales Rep:", reps_list)
+        if "cc_selected_rep" not in st.session_state:
+            st.session_state["cc_selected_rep"] = "All"
+        selected_rep = st.selectbox("Sales Rep:", reps_list, key="cc_selected_rep")
     st.divider()
 
     # STREAMLIT CHUNK: Loading Google Sheets Data...
