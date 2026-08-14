@@ -9,6 +9,6 @@ google-auth-oauthlib
 google-auth-httplib2
 plotly
 matplotlib
-SQLAlchemy
+sqlalchemy
 psycopg2-binary
 pdfkit
