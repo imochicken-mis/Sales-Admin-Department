@@ -1,40 +1,65 @@
-# util.py
 import hashlib
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import streamlit as st
+import pandas as pd
+import numpy as np
 from google.oauth2.service_account import Credentials
+from sqlalchemy import create_engine, text
 
+# ========================================================
+# 0. DATABASE CONNECTION (NEON SQL)
+# ========================================================
+@st.cache_resource
+def get_db_engine():
+    try:
+        db_url = st.secrets["DATABASE_URL"]
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+        engine = create_engine(db_url, pool_size=5, max_overflow=10)
+        return engine
+    except Exception as e:
+        st.error(f"⚠️ Database connection error: {e}")
+        return None
+
+# ========================================================
+# 1. AUTHENTICATION & USER MANAGEMENT
+# ========================================================
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-@st.cache_data(ttl=600, show_spinner=False)
-def get_users_from_sheet():
+@st.cache_data(ttl=86400, show_spinner=False) # පැය 24ක් Cache එක තියාගන්නවා
+def get_users_from_db():
+    users_dict = {}
+    engine = get_db_engine()
+    
+    if not engine:
+        return users_dict
+
     try:
-        # ඔයාගේ Sheet connection function එක මෙතනට දෙන්න (උදා: connect_to_sheets)
-        sh = connect_to_sheets() 
-        ws = sh.worksheet("User_Accounts") # අලුතින් හදපු Sheet එකේ නම
-        records = ws.get_all_records(default_blank="")
-        
-        users_dict = {}
-        for row in records:
+        # 1. කෙලින්ම SQL Database එකෙන් දත්ත ගැනීම පමණයි (ඉතා වේගවත්)
+        with engine.connect() as conn:
+            query = text('SELECT "Username", "Password", "Role" FROM "User_Accounts"')
+            df = pd.read_sql(query, conn)
+            
+        # 2. Dictionary එක සෑදීම
+        for _, row in df.iterrows():
             username = str(row.get("Username", "")).strip()
             password = str(row.get("Password", "")).strip()
             role = str(row.get("Role", "")).strip()
             
-            # Username සහ Password හිස් නැත්නම් පමණක් ඇතුළත් කරගන්න
             if username and password:
                 users_dict[username] = {
-                    "password_hash": hash_password(password), # මෙතනදී Password එක Hash වෙනවා
+                    "password_hash": hash_password(password),
                     "role": role
                 }
-        return users_dict
     except Exception as e:
-        st.error(f"⚠️ Error loading user accounts from sheet: {e}")
-        return {}
+        st.error(f"⚠️ Database Error: Cannot fetch users. Ensure 'User_Accounts' table exists in Neon SQL. Error: {e}")
+        
+    return users_dict
 
 def authenticate(username, password):
-    USERS = get_users_from_sheet()
+    USERS = get_users_from_db()  # අලුත් නම යෙදුවා
     if username in USERS:
         if USERS[username]["password_hash"] == hash_password(password):
             return USERS[username]["role"]
