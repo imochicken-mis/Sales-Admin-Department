@@ -45,8 +45,10 @@ def get_allowed_pages(role):
         return ["Requirement", "dashboard","rep_target","2Cash_Collection_and_Deposit_Report","dashboard_2"]
     if role in ["user1"]:
         return ["1sales_day_book","2Inventory","3Monthly_Forecast","4Working_days","5Rep_Target"]
-    if role in ["user2","user3"]:
+    if role in ["user2"]:
         return ["1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation"]
+    if role in ["user3"]:
+        return ["1Age_Receivable"]
     if role in ["admin1"]:
             return ["Settings"]
     return []

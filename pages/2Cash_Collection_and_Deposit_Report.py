@@ -113,6 +113,7 @@ def show():
             padding-bottom: 2rem !important;
             max-width: 98% !important;
             overflow-x: hidden !important;
+            min-height: 85vh !important;
         }
         [data-testid="stHeader"] { background: transparent !important; }
         
@@ -187,7 +188,7 @@ def show():
     """, unsafe_allow_html=True)
 
     # 🚀 HTML Entity used for the bar chart icon to avoid Unicode SyntaxError
-    st.markdown("<h2 style='text-align: center; color: #00245e; font-weight: 800;'>&#128202; Daily Collection Report</h2>", unsafe_allow_html=True)
+    st.title("Daily Collection Report")
     st.write("")
 
     # STREAMLIT CHUNK: Loading Master Data for Filters...
@@ -221,7 +222,7 @@ def show():
     col1, col2, col3 = st.columns([1, 1.5, 2.5], vertical_alignment="bottom")
     with col1:
         selected_date = st.date_input("Filter Date:", value=datetime.date.today())
-        selected_date_str = selected_date.strftime('%Y-%m-%d')
+        selected_date_str = selected_date.strftime("%Y-%m-%d")
     with col2:
         selected_rep = st.selectbox("Sales Rep:", reps_list)
     st.divider()

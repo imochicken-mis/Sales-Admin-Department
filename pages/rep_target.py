@@ -576,63 +576,69 @@ def show():
     """, unsafe_allow_html=True)
     
     st.title("Rep Sales & Targets Report")
-
     col1, col2 = st.columns([2, 5], vertical_alignment="bottom")
     with col1:
         selected_date = st.date_input("Select Date:", value=datetime.now().date())
-
     selected_date_str = selected_date.strftime("%Y-%m-%d")
     selected_month_str = pd.to_datetime(selected_date_str).strftime("%Y-%m")
     st.divider()
-    btn_calculate_and_save = st.button("▶ Calculate & Save Report", type="primary")
 
-    if st.session_state.get("rep_loaded_for_date") != selected_date_str:
+    @st.cache_data(ttl=60, show_spinner=False)
+    def fetch_existing_reports(date_str, month_str):
         sheet2 = get_sheets()
-        existing_df = load_report_for_date(sheet2, selected_date_str)
-        if existing_df is not None:
-            st.session_state["rep_master_table"] = existing_df
-            st.session_state["rep_report_date"] = selected_date_str
-            st.session_state["rep_source"] = "saved"
-        else:
-            st.session_state.pop("rep_master_table", None)
-            st.session_state.pop("rep_report_date", None)
-            st.session_state["rep_source"] = None
+        df = load_report_for_date(sheet2, date_str)
+        wk = load_weekly_report_for_month(sheet2, month_str)
+        return df, wk
 
-        existing_weekly = load_weekly_report_for_month(sheet2, selected_month_str)
-        if existing_weekly is not None:
+    existing_df, existing_weekly = fetch_existing_reports(selected_date_str, selected_month_str)
+
+    if existing_df is not None and not existing_df.empty:
+        # Report already exists -> load into session_state, DO NOT show the Calculate button
+        st.session_state["rep_master_table"] = existing_df
+        st.session_state["rep_report_date"] = selected_date_str
+        st.session_state["rep_source"] = "saved"
+        if existing_weekly is not None and not existing_weekly.empty:
             st.session_state["rep_weekly_table"] = existing_weekly
+            st.session_state["rep_weekly_month"] = selected_month_str
             st.session_state["rep_weekly_source"] = "saved"
         else:
             st.session_state.pop("rep_weekly_table", None)
             st.session_state["rep_weekly_source"] = None
 
-        st.session_state["rep_loaded_for_date"] = selected_date_str
+        st.info(f"✅ A previously generated report already exists for **{selected_date_str}**.")
+    else:
+        # No report -> clear any stale session_state and show the Calculate button
+        st.session_state.pop("rep_master_table", None)
+        st.session_state.pop("rep_report_date", None)
+        st.session_state.pop("rep_weekly_table", None)
+        st.session_state["rep_source"] = None
+        st.session_state["rep_weekly_source"] = None
 
-    if st.session_state.get("rep_source") == "saved":
-        st.info(f"A previously generated report already exists for '{selected_date_str}'. Showing that.")
+        st.info("No report exists for the selected date. Click the button below to generate and save one.")
 
-    if btn_calculate_and_save:
-        with st.spinner("Calculating and saving to Google Sheet..."):
-            try:
-                clear_raw_cache()
-                master_table = build_master_table(selected_date_str)
-                weekly_table = build_weekly_breakdown(selected_date_str)
+        if st.button("▶ Calculate & Save Report", type="primary"):
+            with st.spinner("Calculating and saving to Google Sheet..."):
+                try:
+                    clear_raw_cache()
+                    master_table = build_master_table(selected_date_str)
+                    weekly_table = build_weekly_breakdown(selected_date_str)
 
-                st.session_state["rep_master_table"] = master_table
-                st.session_state["rep_report_date"] = selected_date_str
-                st.session_state["rep_source"] = "calculated"
+                    sheet2 = get_sheets()
+                    save_report_to_sheet(sheet2, master_table, selected_date_str)
+                    save_weekly_report_to_sheet(sheet2, weekly_table, selected_month_str)
 
-                st.session_state["rep_weekly_table"] = weekly_table
-                st.session_state["rep_weekly_month"] = selected_month_str
-                sheet2 = get_sheets()
-                save_report_to_sheet(sheet2, master_table, selected_date_str)
-                save_weekly_report_to_sheet(sheet2, weekly_table, selected_month_str)
+                    st.session_state["rep_master_table"] = master_table
+                    st.session_state["rep_report_date"] = selected_date_str
+                    st.session_state["rep_weekly_table"] = weekly_table
+                    st.session_state["rep_weekly_month"] = selected_month_str
+                    st.session_state["rep_source"] = "saved"
+                    st.session_state["rep_weekly_source"] = "saved"
 
-                st.session_state["rep_source"] = "saved"
-                st.session_state["rep_weekly_source"] = "saved"
-                st.success(f"Report for '{selected_date_str}' and its weekly breakdown were saved!")
-            except Exception as e:
-                st.error(f"Error during calculation/saving: {e}")
+                    fetch_existing_reports.clear()
+                    st.success(f"Report for '{selected_date_str}' and its weekly breakdown were saved!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error during calculation/saving: {e}")
 
     if "rep_master_table" in st.session_state:
         st.divider()

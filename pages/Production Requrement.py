@@ -148,25 +148,6 @@ def show():
         balance["Balance"] = balance["Qty"] - balance["Forecast Qty"]
         balance = balance.drop(columns=["Item Name", "Qty", "Forecast Qty"])
 
-        # --- NEW: Inventory column (from Sales data -> Inventory tab, filtered by selected date) ---
-        inventory_col = sale_qty.copy().merge(
-            forecast_filtered[["Product Code", "Forecast Qty"]], on="Product Code", how="left"
-        )
-        inv_avail_for_col = (
-            inventory_filtered.set_index("Item Code")["Available Qty"]
-            if not inventory_filtered.empty else pd.Series(dtype=float)
-        )
-        inventory_col = inventory_col.set_index("Product Code")
-        inventory_col["Inventory"] = inv_avail_for_col.reindex(inventory_col.index).fillna(0)
-        inventory_col = inventory_col.reset_index().drop(columns=["Item Name", "Qty", "Forecast Qty"])
-
-        # --- NEW: Buffer Level = (Forecast Qty / Working Days) * 6 ---
-        buffer_level = sale_qty.copy().merge(
-            forecast_filtered[["Product Code", "Forecast Qty"]], on="Product Code", how="left"
-        )
-        buffer_level["Buffer Level"] = (buffer_level["Forecast Qty"] / working_days_value) * 6
-        buffer_level = buffer_level.drop(columns=["Item Name", "Qty", "Forecast Qty"])
-
         dates_up_to_selected = select_date_obj.day
         denom = (dates_up_to_selected - 1) if dates_up_to_selected > 1 else 1
 
@@ -223,8 +204,6 @@ def show():
             .merge(forecast_filtered[["Product Code", "Forecast Qty"]], on="Product Code", how="left")
             .merge(forecast_achievement, on="Product Code", how="left")
             .merge(balance, on="Product Code", how="left")
-            .merge(inventory_col, on="Product Code", how="left")
-            .merge(buffer_level, on="Product Code", how="left")
             .merge(
                 inventory_filtered_clean[["Item Code", "Available Qty"]] if not inventory_filtered_clean.empty else pd.DataFrame(columns=["Item Code", "Available Qty"]),
                 left_on="Product Code", right_on="Item Code", how="left",

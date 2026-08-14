@@ -23,6 +23,12 @@ def show():
         # DSR Tab එක නැත්නම් අලුතින් සෑදීම
         ws_dsr = sh.add_worksheet(title="DSR", rows=3000, cols=10)
 
+    # 🚀 1. DSR2 Tab එකත් සම්බන්ධ කරගැනීම හෝ අලුතින් සෑදීම
+    try:
+        ws_dsr2 = sh.worksheet("DSR2")
+    except gspread.exceptions.WorksheetNotFound:
+        ws_dsr2 = sh.add_worksheet(title="DSR2", rows=3000, cols=10)
+
     # --- 2. UNIQUE LOCAL CACHE ---
     @st.cache_data(ttl=600, show_spinner=False)
     def get_local_dsr_data(unique_key):
@@ -64,6 +70,19 @@ def show():
         remaining = df[standardized_dates != date_str]
         ws_dsr.clear()
         set_with_dataframe(ws_dsr, remaining if not remaining.empty else pd.DataFrame(columns=df.columns))
+        
+        # 🚀 1. DSR2 Tab එකෙන් අදාළ දිනට අදාළ දත්ත වෙනමම මකා දැමීම
+        try:
+            records_2 = ws_dsr2.get_all_records(default_blank="")
+            df_2 = pd.DataFrame(records_2)
+            if not df_2.empty and "Date" in df_2.columns:
+                std_dates_2 = pd.to_datetime(df_2["Date"], errors="coerce").dt.strftime('%Y-%m-%d')
+                std_dates_2 = std_dates_2.fillna(df_2["Date"].astype(str).str.strip())
+                remaining_2 = df_2[std_dates_2 != date_str]
+                ws_dsr2.clear()
+                set_with_dataframe(ws_dsr2, remaining_2 if not remaining_2.empty else pd.DataFrame(columns=df_2.columns))
+        except Exception:
+            pass
         
         clear_sheet_cache() 
         get_local_dsr_data.clear()
@@ -235,8 +254,23 @@ def show():
                             data_to_upload = df_grouped.values.tolist()
                             ws_dsr.append_rows(data_to_upload)
                         
+                            # 🚀 2. DSR2 Tab එකට CSV එකේ ඔරිජිනල් දත්ත (Raw Data) ඒ විදිහටම ඇතුළත් කිරීම
+                            df_dsr2 = df_csv.copy()
+                            # Delete කිරීමට පහසු වීමට පමණක් 'Date' තීරුව මුලට එක් කරමු
+                            if "Date" not in df_dsr2.columns:
+                                df_dsr2.insert(0, "Date", selected_date_str)
+                            
+                            df_dsr2 = df_dsr2.fillna("") # හිස්තැන් මගහැරීම
+                            
+                            all_existing_data_2 = ws_dsr2.get_all_values()
+                            if not all_existing_data_2:
+                                ws_dsr2.append_row(df_dsr2.columns.tolist())
+                            
+                            data_to_upload_2 = df_dsr2.values.tolist()
+                            ws_dsr2.append_rows(data_to_upload_2)
+
                         st.session_state["dsr_uploader_key"] += 1
-                        save_and_refresh("✅ DSR successfully processed and uploaded!")
+                        save_and_refresh("✅ DSR successfully processed! Saved to DSR (Grouped) and DSR2 (Raw Format)!")
 
             except Exception as e:
                 st.error(f"Error processing file: {e}")
