@@ -1,13 +1,13 @@
+import streamlit as st
 import calendar
-from datetime import datetime
 import re
 import time
 import base64
+import datetime
 import platform
 import gspread
 import numpy as np
 import pandas as pd
-import streamlit as st
 from oauth2client.service_account import ServiceAccountCredentials
 
 def show():
@@ -38,6 +38,7 @@ def show():
     @st.cache_data(ttl=600, show_spinner=False)
     def load_raw_data():
         sheet2 = get_sheets()
+
         master_ws = sheet2.worksheet("MasterData")
         targets_ws = sheet2.worksheet("MonthlyTargets")
         sales_ws = sheet2.worksheet("Sales_day_book")
@@ -47,20 +48,12 @@ def show():
         targets_df = pd.DataFrame(targets_ws.get_all_records())
         sales_df = pd.DataFrame(sales_ws.get_all_records())
         working_days_df = pd.DataFrame(working_days_ws.get_all_records())
+
         return master_df, targets_df, sales_df, working_days_df
 
     def clear_raw_cache():
         st.cache_data.clear()
 
-    def save_and_refresh(message, seconds=2):
-        clear_raw_cache()
-        msg_placeholder = st.empty()
-        msg_placeholder.success(message)
-        time.sleep(seconds)
-        msg_placeholder.empty()
-        st.rerun()
-
-    # නම (First Name) වෙන්කරගැනීම සඳහා
     def _normalize_name(name):
         if not isinstance(name, str): 
             return ""
@@ -77,7 +70,7 @@ def show():
         selected_year = select_date_obj.year
         selected_month_name = select_date_obj.strftime("%B")
         selected_month_str = select_date_obj.strftime("%Y-%m")
-        alt_month_str = select_date_obj.strftime("%Y-%b") # e.g., 2026-Jul
+        alt_month_str = select_date_obj.strftime("%Y-%b")
 
         # ---- Working Days ----
         working_days_filtered = working_days_df[
@@ -102,17 +95,19 @@ def show():
         if targets_filtered.empty:
             targets_filtered = targets_df[targets_df["Month"].astype(str).str.lower() == selected_month_name.lower()].copy()
 
+        # 🚀 Google Sheet alignment fix: "No" column is included here
         if targets_filtered.empty:
-            base_df = master_df[["Manager", "Route", "Representative", "Status"]].copy()
+            base_df = master_df[["No", "Manager", "Route", "Representative", "Status"]].copy()
             base_df["Target"] = 0
         else:
-            base_df = targets_filtered[["Manager", "Route", "Representative", "Status", "Target"]].copy()
+            base_df = targets_filtered[["No", "Manager", "Route", "Representative", "Status", "Target"]].copy()
             base_df["Target"] = pd.to_numeric(base_df["Target"], errors='coerce').fillna(0)
 
         base_df["rep_key"] = base_df["Representative"].apply(_normalize_name)
 
         # ---- Sales ----
         date_col = "New_date" if "New_date" in sales_df.columns else "new_date" if "new_date" in sales_df.columns else None
+
         if date_col and not sales_df.empty:
             sales_df["_parsed_date"] = pd.to_datetime(sales_df[date_col], errors="coerce")
             sales_month = sales_df[
@@ -140,9 +135,9 @@ def show():
         master_table["Day Target 2"] = master_table["Day Target"] * worked_days
         master_table["Day Achievement %"] = np.where(master_table["Day Target 2"] > 0, (master_table["Sales"] / master_table["Day Target 2"]) * 100, 0)
         
-        # 🚀 Removed "No" column
+        # 🚀 Google Sheet alignment fix: "No" column is placed exactly at the start
         cols_order = [
-            "Manager", "Route", "Representative", "Status", 
+            "No", "Manager", "Route", "Representative", "Status", 
             "Day Target", "Sales", "Target", "Balance", "Achievement %", 
             "Day Target 2", "Day Achievement %"
         ]
@@ -162,29 +157,34 @@ def show():
         selected_month_str = select_date_obj.strftime("%Y-%m")
         alt_month_str = select_date_obj.strftime("%Y-%b")
 
+        # ---- Targets Filter ----
         targets_filtered = targets_df[
             (targets_df["Month"].astype(str) == selected_month_str) | 
             (targets_df["Month"].astype(str) == alt_month_str)
         ].copy()
-        
+
         if targets_filtered.empty:
             targets_filtered = targets_df[targets_df["Month"].astype(str).str.lower() == selected_month_name.lower()].copy()
             
+        # 🚀 Google Sheet alignment fix: "No" column is included here
         if targets_filtered.empty:
-            base_df = master_df[["Manager", "Route", "Representative", "Status"]].copy()
+            base_df = master_df[["No", "Manager", "Route", "Representative", "Status"]].copy()
             base_df["Target"] = 0
         else:
-            base_df = targets_filtered[["Manager", "Route", "Representative", "Status", "Target"]].copy()
+            base_df = targets_filtered[["No", "Manager", "Route", "Representative", "Status", "Target"]].copy()
             base_df["Target"] = pd.to_numeric(base_df["Target"], errors='coerce').fillna(0)
 
         base_df["rep_key"] = base_df["Representative"].apply(_normalize_name)
         
+        # ---- Weeks Calculation (Monday Start) ----
         days_in_month = calendar.monthrange(selected_year, selected_month)[1]
-        first_weekday = datetime(selected_year, selected_month, 1).weekday()
+        first_weekday = datetime.datetime(selected_year, selected_month, 1).weekday() 
         total_weeks = ((days_in_month - 1 + first_weekday) // 7) + 1
         week_cols = [f"Week {i}" for i in range(1, total_weeks + 1)]
         
+        # ---- Sales Day Book ----
         date_col = "New_date" if "New_date" in sales_df.columns else "new_date" if "new_date" in sales_df.columns else None
+
         if date_col and not sales_df.empty:
             sales_df["_parsed_date"] = pd.to_datetime(sales_df[date_col], errors="coerce")
             df = sales_df[
@@ -208,6 +208,7 @@ def show():
         else:
             weekly_pivot = pd.DataFrame(columns=["rep_key"] + week_cols)
             
+        # ---- Merge & Finalize ----
         weekly_table = base_df.merge(weekly_pivot, on="rep_key", how="left")
         
         for c in week_cols:
@@ -216,8 +217,8 @@ def show():
         weekly_table[week_cols] = weekly_table[week_cols].fillna(0)
         weekly_table["Total Sales"] = weekly_table[week_cols].sum(axis=1)
         
-        # 🚀 Removed "No" column
-        cols_order = ["Manager", "Route", "Representative", "Status", "Target", "Total Sales"] + week_cols
+        # 🚀 Google Sheet alignment fix: "No" column is included here
+        cols_order = ["No", "Manager", "Route", "Representative", "Status", "Target", "Total Sales"] + week_cols
         weekly_table = weekly_table[cols_order]
         
         return weekly_table
@@ -228,22 +229,27 @@ def show():
     def style_dataframe(df: pd.DataFrame, is_weekly=False):
         df_display = df.copy()
         
-        # 🚀 Exclude text columns from formatting
-        exclude_cols = ["Manager", "Route", "Representative", "Status"]
-        numeric_cols = [c for c in df_display.columns if c not in exclude_cols]
-        pct_cols = [c for c in numeric_cols if "%" in c]
-
-        def safe_formatter(val, is_pct=False):
+        # 🚀 1. Remove "No" column completely from Web UI and HTML Print!
+        if "No" in df_display.columns:
+            df_display = df_display.drop(columns=["No"])
+            
+        def safe_formatter(val, is_pct):
+            if pd.isna(val) or val == "": return "-"
             try:
-                v = float(val)
-                if pd.isna(v) or v == 0: return "-"
-                return f"{v:,.2f}%" if is_pct else f"{v:,.2f}"
+                num = float(val)
+                return f"{num:,.2f}%" if is_pct else f"{num:,.2f}"
             except:
                 return str(val)
-
-        format_dict = {c: (lambda x, flag=(c in pct_cols): safe_formatter(x, flag)) for c in numeric_cols}
+                
+        format_dict = {}
+        exclude_cols = ["Manager", "Route", "Representative", "Status"]
+        for c in df_display.columns:
+            if c not in exclude_cols:
+                is_pct_col = "%" in c or ("Target" in c and "Daily" in c)
+                format_dict[c] = lambda x, p=is_pct_col: safe_formatter(x, p)
+                
         styler = df_display.style.format(format_dict)
-
+        
         def safe_get_float(val):
             try:
                 if pd.isna(val) or val == "": return None
@@ -255,6 +261,7 @@ def show():
         if not is_weekly:
             def highlight_rows(row):
                 styles = [''] * len(row)
+                
                 if 'Achievement %' in row.index:
                     ach_idx = row.index.get_loc('Achievement %')
                     ach_val = safe_get_float(row['Achievement %'])
@@ -296,11 +303,13 @@ def show():
                 return styles
             styler = styler.apply(highlight_rows, axis=1)
 
-        # 🚀 No table-level backgrounds applied here so the HTML/CSS handles the Grid UI perfectly
+        # 🚀 Grid Design and Header Colors for Web and HTML
         styler = styler.set_table_styles([
             {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse')]},
-            {'selector': 'th', 'props': [('text-align', 'center'), ('white-space', 'nowrap')]},
-            {'selector': 'td', 'props': [('text-align', 'right'), ('white-space', 'nowrap')]}
+            {'selector': 'th', 'props': [('background-color', '#00245E'), ('color', '#FFFFFF'), ('text-align', 'center'), ('padding', '10px'), ('border', '1px solid #ADE8F4'), ('white-space', 'nowrap')]},
+            {'selector': 'td', 'props': [('border', '1px solid #ADE8F4'), ('padding', '8px'), ('text-align', 'right'), ('white-space', 'nowrap')]},
+            {'selector': 'tr:nth-child(even)', 'props': [('background-color', '#F8FDFF')]},
+            {'selector': 'tr:nth-child(odd)', 'props': [('background-color', '#FFFFFF')]}
         ])
         
         try: styler = styler.hide(axis="index")
@@ -308,10 +317,10 @@ def show():
             
         return styler
 
+    # ============================================================
+    # 🌟 GENERATE HTML (Replaces PDF generation)
+    # ============================================================
     def generate_pdf_or_html(styler, title, date_str):
-        try: import pdfkit
-        except ImportError: pdfkit = None
-            
         try:
             with open("logo.png", "rb") as image_file:
                 logo_base64 = base64.b64encode(image_file.read()).decode()
@@ -325,26 +334,24 @@ def show():
             <meta charset="utf-8">
             <title>{title}</title>
             <style>
-                @page {{ size: A4 landscape; margin: 10mm; }}
-                body {{ font-family: 'Helvetica', 'Arial', sans-serif; color: #03045E; margin: 0; background-color: #ffffff; }}
+                body {{ font-family: 'Helvetica', 'Arial', sans-serif; color: #03045E; margin: 20px; background-color: #ffffff; }}
                 table.header-table {{ width: 100%; background-color: #00245E; color: white; border-bottom: 5px solid #DE9C40; border-radius: 8px 8px 0 0; margin-bottom: 15px; border-collapse: collapse; }}
                 table.header-table td {{ border: none; padding: 15px; background-color: #00245E; text-align: left; vertical-align: middle; }}
                 .info-section {{ background-color: #CAF0F8; padding: 15px 20px; border-left: 6px solid #0096C7; margin-bottom: 15px; border-radius: 4px; }}
+                
                 .info-section h3 {{ margin: 0; color: #023E8A; font-size: 18px; }}
                 
-                /* 🚀 PDF Data Table Grid Styles */
-                table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 9.5px !important; table-layout: auto; margin-top: 10px; font-family: 'Arial', sans-serif; border: 1px solid #ADE8F4 !important; }}
-                table.dataframe th, table.dataframe td {{ border: 1px solid #ADE8F4 !important; padding: 6px; text-align: right; white-space: nowrap !important; }}
-                table.dataframe th {{ background-color: #03045E !important; color: white !important; text-align: center !important; font-weight: bold; }}
-                
-                /* Alternating Row Colors */
+                /* HTML Table Styles */
+                table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 11px !important; table-layout: fixed; margin-top: 10px; font-family: 'Arial', sans-serif; }}
+                table.dataframe th, table.dataframe td {{ border: 1px solid #ADE8F4 !important; padding: 8px 6px; text-align: right; white-space: normal; word-wrap: break-word; overflow-wrap: break-word; }}
+                table.dataframe th {{ background-color: #00245E !important; color: white !important; text-align: center !important; font-weight: bold; }}
                 table.dataframe tbody tr:nth-child(even) {{ background-color: #F8FDFF !important; }}
                 table.dataframe tbody tr:nth-child(odd) {{ background-color: #FFFFFF !important; }}
                 
-                * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }}
+                * {{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
             </style>
         </head>
-        <body>
+        <body style="zoom: 0.85;">
             <table class="header-table">
                 <tr>
                     <td style="width: 70px;">{img_tag}</td>
@@ -354,23 +361,23 @@ def show():
             <div class="info-section">
                 <table style="width: 100%; border: none;">
                     <tr>
-                        <td style="text-align: left; border: none; padding: 0;"><h3>Department: Sales & Admin</h3></td>
+                        <td style="text-align: left; border: none; padding: 0;"><h3>Department: Sales & Marketing</h3></td>
                         <td style="text-align: center; border: none; padding: 0;"><h3>Report: {title}</h3></td>
                         <td style="text-align: right; border: none; padding: 0;"><h3>Date: {date_str}</h3></td>
                     </tr>
                 </table>
             </div>
             
-            <!-- 🚀 Table Legend for PDF -->
-            <table style="width: 100%; border: none; margin-bottom: 15px; font-size: 11px; font-weight: bold; color: #03045E;">
+            <!-- HTML Legend Table -->
+            <table style="width: 100%; border: none; margin-bottom: 15px; font-size: 14px; font-weight: bold; color: #03045E;">
                 <tr>
                     <td style="text-align: right; border: none; padding: 0;">
-                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #D4EDDA; border: 1px solid #155724; vertical-align: middle;"></span><span style="vertical-align: middle;"> Target &ge; 100% &nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #FFF3CD; border: 1px solid #856404; vertical-align: middle;"></span><span style="vertical-align: middle;"> 75% - 99% &nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #FFE8CC; border: 1px solid #A04000; vertical-align: middle;"></span><span style="vertical-align: middle;"> 50% - 74% &nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #F8D7DA; border: 1px solid #721C24; vertical-align: middle;"></span><span style="vertical-align: middle;"> &lt; 50% &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #E2F0CB; border: 1px solid #2D5A27; vertical-align: middle;"></span><span style="vertical-align: middle;"> Balance &ge; 0 &nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 12px; height: 12px; background-color: #FFD1D1; border: 1px solid #900000; vertical-align: middle;"></span><span style="vertical-align: middle;"> Balance &lt; 0</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #D4EDDA; border: 1px solid #155724; vertical-align: middle;"></span><span style="vertical-align: middle;"> Target &ge; 100% &nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #FFF3CD; border: 1px solid #856404; vertical-align: middle;"></span><span style="vertical-align: middle;"> 75% - 99% &nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #FFE8CC; border: 1px solid #A04000; vertical-align: middle;"></span><span style="vertical-align: middle;"> 50% - 74% &nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #F8D7DA; border: 1px solid #721C24; vertical-align: middle;"></span><span style="vertical-align: middle;"> &lt; 50% &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #E2F0CB; border: 1px solid #2D5A27; vertical-align: middle;"></span><span style="vertical-align: middle;"> Balance &ge; 0 &nbsp;&nbsp;&nbsp;</span>
+                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #FFD1D1; border: 1px solid #900000; vertical-align: middle;"></span><span style="vertical-align: middle;"> Balance &lt; 0</span>
                     </td>
                 </tr>
             </table>
@@ -381,32 +388,35 @@ def show():
         """
         
         options = {
-            'page-size': 'A4',
-            'orientation': 'Landscape',
-            'margin-top': '0.3in',
-            'margin-right': '0.3in',
-            'margin-bottom': '0.3in',
-            'margin-left': '0.3in',
-            'encoding': "UTF-8",
-            'enable-local-file-access': None
+            'page-size': 'A4', 'orientation': 'Landscape', 'margin-top': '0.3in', 'margin-right': '0.3in',
+            'margin-bottom': '0.3in', 'margin-left': '0.3in', 'encoding': "UTF-8", 'enable-local-file-access': None
         }
-        
-        if pdfkit:
-            try: 
-                config = None
-                if platform.system() == "Windows":
-                    path_wkhtmltopdf = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
-                    config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
-                return pdfkit.from_string(html_content, False, options=options, configuration=config), "pdf", "application/pdf"
-            except Exception as e: 
-                st.error(f"⚠️ PDF Error: {e}")
+
+        if platform.system() == "Windows":
+            try:
+                import pdfkit
+                path_wkhtmltopdf = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
+                config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
+                pdf_bytes = pdfkit.from_string(html_content, False, options=options, configuration=config)
+                return pdf_bytes, "pdf", "application/pdf"
+            except Exception as e:
+                pass
         else:
-            st.error("⚠️ 'pdfkit' library is not installed!")
-        
+            try:
+                from xhtml2pdf import pisa
+                from io import BytesIO
+                result = BytesIO()
+                pisa_status = pisa.CreatePDF(BytesIO(html_content.encode("utf-8")), dest=result)
+                if not pisa_status.err:
+                    return result.getvalue(), "pdf", "application/pdf"
+            except Exception as e:
+                pass
+
+        # 🚀 Fallback to HTML Export
         return html_content.encode('utf-8'), "html", "text/html"
 
     # ============================================================
-    # 6. SAVE / LOAD / DELETE helpers for Google Sheet tabs
+    # 6. SAVE / LOAD helpers for Google Sheet tabs
     # ============================================================
     def _get_or_create_ws(sheet, tab_name, headers=None, rows=2000, cols=30):
         try:
@@ -417,74 +427,23 @@ def show():
                 ws.append_row(headers)
         return ws
 
-    def _delete_records(sheet, tab_name, key_col_name, key_value):
-        try:
-            ws = sheet.worksheet(tab_name)
-        except gspread.exceptions.WorksheetNotFound:
-            return
-
-        all_values = ws.get_all_values()
-        if not all_values or len(all_values) < 2:
-            return
-
-        header = all_values[0]
-        if key_col_name not in header:
-            return
-
-        key_col_idx = header.index(key_col_name)
-        match_val = str(key_value).strip()
-        rows_to_delete = []
-
-        for idx, row in enumerate(all_values, start=1):
-            if len(row) > key_col_idx:
-                sheet_val = str(row[key_col_idx]).strip()
-                if key_col_name == "Date":
-                    try: sheet_val = pd.to_datetime(sheet_val).strftime("%Y-%m-%d")
-                    except: pass
-                elif key_col_name == "Month":
-                    try: sheet_val = pd.to_datetime(sheet_val).strftime("%Y-%m")
-                    except: pass
-                if sheet_val == match_val:
-                    rows_to_delete.append(idx)
-
-        if rows_to_delete:
-            rows_to_delete.sort()
-            ranges = []
-            start = prev = rows_to_delete[0]
-            for r in rows_to_delete[1:]:
-                if r == prev + 1: prev = r
-                else:
-                    ranges.append((start, prev))
-                    start = prev = r
-            ranges.append((start, prev))
-            sheet_id = ws.id
-            requests = []
-            for (start_row, end_row) in reversed(ranges):
-                requests.append({
-                    "deleteDimension": {
-                        "range": {
-                            "sheetId": sheet_id,
-                            "dimension": "ROWS",
-                            "startIndex": start_row - 1,
-                            "endIndex": end_row,
-                        }
-                    }
-                })
-            ws.spreadsheet.batch_update({"requests": requests})
-
     def _save_df_to_tab(sheet, tab_name: str, df: pd.DataFrame, key_col_name: str, key_value: str):
         df = df.copy()
         df = df.replace([np.inf, -np.inf], 0).fillna(0)
         df.insert(0, key_col_name, key_value)
+
         headers = df.columns.tolist()
         ws = _get_or_create_ws(sheet, tab_name, headers=headers)
+
         all_values = ws.get_all_values()
         if not all_values:
             ws.append_row(headers)
             all_values = [headers]
+
         header = all_values[0]
         if key_col_name not in header:
             raise ValueError(f"The '{tab_name}' tab is missing a '{key_col_name}' column. Clear the tab and try again.")
+
         key_col_idx = header.index(key_col_name)
         rows_to_delete = []
         match_val = str(key_value).strip()
@@ -500,6 +459,7 @@ def show():
                     except: pass
                 if sheet_val == match_val:
                     rows_to_delete.append(idx)
+
         if rows_to_delete:
             rows_to_delete.sort()
             ranges = []
@@ -510,6 +470,7 @@ def show():
                     ranges.append((start, prev))
                     start = prev = r
             ranges.append((start, prev))
+
             sheet_id = ws.id
             requests = []
             for (start_row, end_row) in reversed(ranges):
@@ -524,6 +485,7 @@ def show():
                     }
                 })
             ws.spreadsheet.batch_update({"requests": requests})
+
         values = df.astype(str).values.tolist()
         ws.append_rows(values, value_input_option="USER_ENTERED")
         return True
@@ -531,10 +493,13 @@ def show():
     def _load_df_from_tab(sheet, tab_name: str, key_col_name: str, key_value: str):
         try: ws = sheet.worksheet(tab_name)
         except gspread.exceptions.WorksheetNotFound: return None
+
         all_values = ws.get_all_values()
         if len(all_values) < 2: return None
+
         header = all_values[0]
         if key_col_name not in header: return None
+
         key_col_idx = header.index(key_col_name)
         match_val = str(key_value).strip()
         rows = []
@@ -552,17 +517,100 @@ def show():
                 if sheet_val == match_val: rows.append(row)
                     
         if not rows: return None
+
         fixed_rows = [row + [""] * (len(header) - len(row)) for row in rows]
         return pd.DataFrame(fixed_rows, columns=header)
 
+    def _delete_records(sheet, tab_name, key_col_name, key_value):
+        try:
+            ws = sheet.worksheet(tab_name)
+        except gspread.exceptions.WorksheetNotFound:
+            return
+            
+        all_values = ws.get_all_values()
+        if not all_values or len(all_values) < 2:
+            return
+            
+        header = all_values[0]
+        if key_col_name not in header:
+            return
+            
+        key_col_idx = header.index(key_col_name)
+        match_val = str(key_value).strip()
+        rows_to_delete = []
+        
+        for idx, row in enumerate(all_values, start=1):
+            if len(row) > key_col_idx:
+                sheet_val = str(row[key_col_idx]).strip()
+                if key_col_name == "Date":
+                    try: sheet_val = pd.to_datetime(sheet_val).strftime("%Y-%m-%d")
+                    except: pass
+                elif key_col_name == "Month":
+                    try: sheet_val = pd.to_datetime(sheet_val).strftime("%Y-%m")
+                    except: pass
+                if sheet_val == match_val:
+                    rows_to_delete.append(idx)
+                    
+        if rows_to_delete:
+            rows_to_delete.sort()
+            ranges = []
+            start = prev = rows_to_delete[0]
+            for r in rows_to_delete[1:]:
+                if r == prev + 1: prev = r
+                else:
+                    ranges.append((start, prev))
+                    start = prev = r
+            ranges.append((start, prev))
+            sheet_id = ws.id
+            requests = []
+            for (start_row, end_row) in reversed(ranges):
+                requests.append({
+                    "deleteDimension": {
+                        "range": { "sheetId": sheet_id, "dimension": "ROWS", "startIndex": start_row - 1, "endIndex": end_row }
+                    }
+                })
+            ws.spreadsheet.batch_update({"requests": requests})
+
     def save_report_to_sheet(sheet, df_report: pd.DataFrame, selected_date_str: str):
         return _save_df_to_tab(sheet, "Rep_Report", df_report, "Date", selected_date_str)
+
     def load_report_for_date(sheet, selected_date_str: str):
         return _load_df_from_tab(sheet, "Rep_Report", "Date", selected_date_str)
+
     def save_weekly_report_to_sheet(sheet, df_weekly: pd.DataFrame, month_str: str):
         return _save_df_to_tab(sheet, "Rep_Weekly", df_weekly, "Month", month_str)
+
     def load_weekly_report_for_month(sheet, month_str: str):
         return _load_df_from_tab(sheet, "Rep_Weekly", "Month", month_str)
+
+    def enforce_numeric_types(df: pd.DataFrame) -> pd.DataFrame:
+        """Normalize report values and safely remove duplicate spreadsheet headers."""
+        df = df.copy()
+        df.columns = [str(col).strip() for col in df.columns]
+        df = df.loc[:, ~df.columns.duplicated(keep="first")].copy()
+
+        # 🚀 Google Sheet එකෙන් එන "No" තීරුවත් මෙතනදි අංකයක් නෙවෙයි, Text විදිහට තියාගන්නවා
+        text_cols = [
+            "Date", "Month", "No", "Manager", "Route", "Representative", "Status"
+        ]
+
+        for col in df.columns:
+            if col not in text_cols:
+                cleaned = (
+                    df[col]
+                    .astype(str)
+                    .str.replace(",", "", regex=False)
+                    .str.replace("%", "", regex=False)
+                    .str.strip()
+                )
+                df[col] = pd.to_numeric(cleaned, errors="coerce").fillna(0.0)
+
+        if "Date" in df.columns:
+            df = df.drop(columns=["Date"])
+        if "Month" in df.columns:
+            df = df.drop(columns=["Month"])
+
+        return df
 
     # ============================================================
     # 7. STREAMLIT UI
@@ -571,54 +619,86 @@ def show():
         st.set_page_config(page_title="Rep Sales Report", layout="wide")
     except:
         pass
-    
+        
     st.markdown("""
         <style>
         :root {
-            --c-900: #03045E; --c-800: #023E8A; --c-700: #0077B6;
-            --c-600: #0096C7; --c-500: #00B4D8; --c-400: #48CAE4;
-            --c-300: #90E0EF; --c-200: #ADE8F4; --c-100: #CAF0F8;
+            --c-900: #03045E;
+            --c-800: #023E8A;
+            --c-700: #0077B6;
+            --c-600: #0096C7;
+            --c-500: #00B4D8;
+            --c-400: #48CAE4;
+            --c-300: #90E0EF;
+            --c-200: #ADE8F4;
+            --c-100: #CAF0F8;
             --accent: #DE9C40;
         }
-        .stApp { background: linear-gradient(135deg, var(--c-100) 0%, #FFFFFF 100%); color: var(--c-900); }
-        [data-testid="stHeader"] { background: transparent !important; }
-        .block-container { 
-            padding-top: 1rem !important; 
-            padding-bottom: 2rem !important; 
-            max-width: 98% !important; 
-            overflow-x: hidden !important; 
-            min-height: 85vh !important; 
-        }
-        h1, h2, h3 { color: var(--c-900) !important; }
-        
-        button[kind="primary"] { background-color: #03045E !important; color: white !important; border-radius: 6px !important; font-weight: 600 !important; }
-        button[kind="primary"]:hover { background-color: #0077B6 !important; }
-        
-        div[data-testid="stDateInput"] label p {
-            font-family: 'Arial', sans-serif !important; font-weight: 600 !important; font-size: 16px !important; color: #03045E !important;
-        }
-        div[data-testid="stDateInput"] div[data-baseweb="input"] {
-            border: 2px solid #0096C7 !important; border-radius: 8px !important; background-color: #F8FDFF !important; transition: all 0.3s ease-in-out; padding-left: 5px;
-        }
-        div[data-testid="stDateInput"] div[data-baseweb="input"]:focus-within {
-            border: 2px solid #03045E !important; box-shadow: 0 0 8px rgba(3, 4, 94, 0.4) !important;
-        }
-        
-        div.element-container:has(.delete-target), div.element-container:has(.cancel-target) { display: none; }
-        div.element-container:has(.delete-target) + div.element-container button {
-            background-color: #D90429 !important; color: white !important; border: 1px solid #D90429 !important;
-        }
-        div.element-container:has(.delete-target) + div.element-container button:hover {
-            background-color: #B20322 !important; border: 1px solid #B20322 !important; color: white !important;
-        }
-        div.element-container:has(.cancel-target) + div.element-container button {
-            background-color: #28a745 !important; color: white !important; border: 1px solid #28a745 !important;
-        }
-        div.element-container:has(.cancel-target) + div.element-container button:hover {
-            background-color: #218838 !important; border: 1px solid #218838 !important; color: white !important;
+
+        /* App Background */
+        .stApp {
+            background: linear-gradient(135deg, var(--c-100) 0%, #FFFFFF 100%);
+            color: var(--c-900);
         }
 
-        /* 🚀 අලුත් Table CSS එක (UI එකට - Grid Look එක) */
+        /* Hide Header background */
+        [data-testid="stHeader"] {
+            background: transparent !important;
+        }
+
+        /* Hide Top Padding & Overflow fixes */
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 2rem !important;
+            max-width: 98% !important;
+            overflow-x: hidden !important;
+            min-height: 85vh !important;
+        }
+
+        h1, h2, h3 { color: var(--c-900) !important; }
+
+        div[data-testid="stDateInput"] label p {
+            font-family: 'Arial', sans-serif !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+            color: #03045E !important;
+        }
+        div[data-testid="stDateInput"] div[data-baseweb="input"] {
+            border: 2px solid #0096C7 !important;
+            border-radius: 8px !important;
+            background-color: #F8FDFF !important;
+            transition: all 0.3s ease-in-out;
+            padding-left: 5px;
+        }
+        div[data-testid="stDateInput"] div[data-baseweb="input"]:focus-within {
+            border: 2px solid #03045E !important;
+            box-shadow: 0 0 8px rgba(3, 4, 94, 0.4) !important;
+        }
+
+        /* Save and Calculate Buttons Styling */
+        button[kind="primary"] {
+            background-color: #03045E !important;
+            color: white !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+        }
+        button[kind="primary"]:hover {
+            background-color: #0077B6 !important;
+        }
+        
+        /* Secondary Buttons Styling */
+        button[kind="secondary"] {
+            background-color: #0096C7 !important;
+            color: white !important;
+            border-color: #0096C7 !important;
+            border-radius: 6px !important;
+        }
+        button[kind="secondary"]:hover {
+            background-color: #023E8A !important;
+            border-color: #023E8A !important;
+        }
+
+        /* 🚀 අලුත් Table CSS එක (UI එකට) */
         .table-container {
             max-height: 500px;
             overflow-y: auto;
@@ -649,7 +729,7 @@ def show():
             text-align: center !important;
             color: #FFFFFF !important;
             font-weight: 900;
-            background-color: #03045E !important;
+            background-color: #00245e !important;
             border: 1px solid #ADE8F4 !important;
         }
         .table-container td {
@@ -657,7 +737,6 @@ def show():
             padding: 10px 8px;
             white-space: nowrap;
         }
-        /* Alternating row colors for Web UI */
         .table-container tbody tr:nth-child(even) {
             background-color: #F8FDFF !important;
         }
@@ -668,6 +747,21 @@ def show():
             background-color: #EAF8FF !important;
             transition: 0.2s;
         }
+
+        /* Delete / Cancel confirm buttons */
+        div.element-container:has(.delete-target), div.element-container:has(.cancel-target) { display: none; }
+        div.element-container:has(.delete-target) + div.element-container button {
+            background-color: #D90429 !important; color: white !important; border: 1px solid #D90429 !important;
+        }
+        div.element-container:has(.delete-target) + div.element-container button:hover {
+            background-color: #B20322 !important; border: 1px solid #B20322 !important; color: white !important;
+        }
+        div.element-container:has(.cancel-target) + div.element-container button {
+            background-color: #28a745 !important; color: white !important; border: 1px solid #28a745 !important;
+        }
+        div.element-container:has(.cancel-target) + div.element-container button:hover {
+            background-color: #218838 !important; border: 1px solid #218838 !important; color: white !important;
+        }
         </style>
     """, unsafe_allow_html=True)
     
@@ -675,7 +769,7 @@ def show():
     
     col1, col2 = st.columns([2, 5], vertical_alignment="bottom")
     with col1:
-        selected_date = st.date_input("Select Date:", value=datetime.now().date())
+        selected_date = st.date_input("Select Date:", value=datetime.date.today())
         
     selected_date_str = selected_date.strftime("%Y-%m-%d")
     selected_month_str = pd.to_datetime(selected_date_str).strftime("%Y-%m")
@@ -692,9 +786,58 @@ def show():
     existing_df, existing_weekly = fetch_existing_reports(selected_date_str, selected_month_str)
 
     if existing_df is not None and not existing_df.empty:
+        st.session_state["rep_master_table"] = existing_df
+        st.session_state["rep_report_date"] = selected_date_str
+        st.session_state["rep_source"] = "saved"
+        if existing_weekly is not None and not existing_weekly.empty:
+            st.session_state["rep_weekly_table"] = existing_weekly
+            st.session_state["rep_weekly_month"] = selected_month_str
+            st.session_state["rep_weekly_source"] = "saved"
+        else:
+            st.session_state.pop("rep_weekly_table", None)
+            st.session_state["rep_weekly_source"] = None
+
         st.info(f"✅ A previously generated report already exists for **{selected_date_str}**.")
+    else:
+        st.session_state.pop("rep_master_table", None)
+        st.session_state.pop("rep_report_date", None)
+        st.session_state.pop("rep_weekly_table", None)
+        st.session_state["rep_source"] = None
+        st.session_state["rep_weekly_source"] = None
+        st.session_state["confirm_delete_rep_report"] = False
+
+        st.info("No report exists for the selected date. Click the button below to generate and save one.")
+
+        if st.button("▶ Calculate & Save Report", type="primary"):
+            with st.spinner("Calculating and saving to Google Sheet..."):
+                try:
+                    clear_raw_cache()
+                    master_table = build_master_table(selected_date_str)
+                    weekly_table = build_weekly_breakdown(selected_date_str)
+
+                    sheet2 = get_sheets()
+                    save_report_to_sheet(sheet2, master_table, selected_date_str)
+                    save_weekly_report_to_sheet(sheet2, weekly_table, selected_month_str)
+
+                    st.session_state["rep_master_table"] = master_table
+                    st.session_state["rep_report_date"] = selected_date_str
+                    st.session_state["rep_weekly_table"] = weekly_table
+                    st.session_state["rep_weekly_month"] = selected_month_str
+                    st.session_state["rep_source"] = "saved"
+                    st.session_state["rep_weekly_source"] = "saved"
+
+                    fetch_existing_reports.clear()
+                    st.success(f"Report for '{selected_date_str}' and its weekly breakdown were saved!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error during calculation/saving: {e}")
+
+    if "rep_master_table" in st.session_state:
+        st.divider()
+        st.subheader(f"Report for {st.session_state['rep_report_date']}")
         
-        # 🚀 Web App එකේ Legend එක ලොකු කිරීම
+        report_df = enforce_numeric_types(st.session_state["rep_master_table"])
+        
         st.markdown("""
         <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px; font-size: 16px; font-weight: 600; color: #03045E; background: white; padding: 12px; border-radius: 6px; border: 1px solid #D1E5EB;">
             <span style="color: #666; font-size: 16px;">Targets:</span>
@@ -708,84 +851,110 @@ def show():
             <div style="display: flex; align-items: center; gap: 6px;"><div style="width: 18px; height: 18px; background-color: #FFD1D1; border: 1px solid #900000; border-radius: 4px;"></div> &lt; 0 (Short)</div>
         </div>
         """, unsafe_allow_html=True)
+
+        styled_master = style_dataframe(report_df, is_weekly=False)
         
-        # 'Date' column shouldn't exist from the build function, but if it does (from loading), drop it.
-        if 'Date' in existing_df.columns:
-            existing_df = existing_df.drop(columns=['Date'])
-            
-        styled_master = style_dataframe(existing_df, is_weekly=False)
-        
-        # 🚀 Use custom HTML wrapper instead of st.dataframe
+        # 🚀 HTML Container (Web App Grid View)
         st.markdown(f"<div class='table-container'>{styled_master.to_html()}</div>", unsafe_allow_html=True)
-        
+
         c1, c2 = st.columns(2)
         with c1:
-            csv_bytes = existing_df.to_csv(index=False).encode("utf-8-sig")
-            st.download_button("⬇ Download Report CSV", data=csv_bytes, file_name=f"rep_sales_report_{selected_date_str}.csv", mime="text/csv", use_container_width=True)
+            # 🚀 CSV එක Download කරද්දිත් "No" තීරුව අයින් වෙනවා
+            csv_df = report_df.drop(columns=["No"], errors="ignore")
+            csv_bytes = csv_df.to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                label="⬇ Download Report CSV",
+                data=csv_bytes,
+                file_name=f"rep_sales_report_{st.session_state['rep_report_date']}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
         with c2:
-            export_data, ext, mime = generate_pdf_or_html(styled_master, "Representative Sales & Targets", selected_date_str)
-            st.download_button(f"🖨️ Download as PDF/HTML", data=export_data, file_name=f"rep_sales_report_{selected_date_str}.{ext}", mime=mime, use_container_width=True)
+            export_data, ext, mime = generate_pdf_or_html(styled_master, "Representative Sales & Targets", st.session_state['rep_report_date'])
+            st.download_button(
+                label=f"🖨️ Download HTML Report",
+                data=export_data,
+                file_name=f"rep_sales_report_{st.session_state['rep_report_date']}.{ext}",
+                mime=mime,
+                use_container_width=True
+            )
 
-        if existing_weekly is not None and not existing_weekly.empty:
-            st.divider()
-            st.subheader(f"Weekly Breakdown — {pd.to_datetime(selected_date_str).strftime('%B %Y')}")
-            if 'Date' in existing_weekly.columns:
-                existing_weekly = existing_weekly.drop(columns=['Date'])
-            if 'Month' in existing_weekly.columns:
-                existing_weekly = existing_weekly.drop(columns=['Month'])
-                
-            styled_weekly = style_dataframe(existing_weekly, is_weekly=True)
+        st.divider()
+        st.subheader(f"Weekly Breakdown — {pd.to_datetime(st.session_state['rep_report_date']).strftime('%B %Y')}")
+
+        if "rep_weekly_table" not in st.session_state:
+            with st.spinner("Building weekly breakdown..."):
+                try:
+                    st.session_state["rep_weekly_table"] = build_weekly_breakdown(st.session_state["rep_report_date"])
+                    st.session_state["rep_weekly_month"] = selected_month_str
+                    st.session_state["rep_weekly_source"] = "calculated"
+                except Exception as e:
+                    st.error(f"Could not build weekly breakdown: {e}")
+
+        if "rep_weekly_table" in st.session_state:
+            weekly_df = enforce_numeric_types(st.session_state["rep_weekly_table"])
+            styled_weekly = style_dataframe(weekly_df, is_weekly=True)
             
-            # 🚀 Use custom HTML wrapper for weekly breakdown too
+            # 🚀 Wrap the Weekly table in HTML Container too
             st.markdown(f"<div class='table-container'>{styled_weekly.to_html()}</div>", unsafe_allow_html=True)
 
             wc1, wc2 = st.columns(2)
             with wc1:
-                weekly_csv_bytes = existing_weekly.to_csv(index=False).encode("utf-8-sig")
-                st.download_button("⬇ Download Weekly Breakdown CSV", data=weekly_csv_bytes, file_name=f"rep_weekly_breakdown_{selected_month_str}.csv", mime="text/csv", use_container_width=True)
+                # 🚀 CSV එක Download කරද්දිත් "No" තීරුව අයින් වෙනවා
+                weekly_csv_df = weekly_df.drop(columns=["No"], errors="ignore")
+                weekly_csv_bytes = weekly_csv_df.to_csv(index=False).encode("utf-8-sig")
+                st.download_button(
+                    label="⬇ Download Weekly Breakdown CSV",
+                    data=weekly_csv_bytes,
+                    file_name=f"rep_weekly_breakdown_{selected_month_str}.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
             with wc2:
                 w_export_data, w_ext, w_mime = generate_pdf_or_html(styled_weekly, "Weekly Sales Breakdown", selected_month_str)
-                st.download_button(f"🖨️ Download Weekly as PDF/HTML", data=w_export_data, file_name=f"rep_weekly_breakdown_{selected_month_str}.{w_ext}", mime=w_mime, use_container_width=True)
+                st.download_button(
+                    label=f"🖨️ Download Weekly HTML Report",
+                    data=w_export_data,
+                    file_name=f"rep_weekly_breakdown_{selected_month_str}.{w_ext}",
+                    mime=w_mime,
+                    use_container_width=True
+                )
 
+        # ---- DELETE REPORT ----
         st.divider()
-        if st.button("🗑️ Delete this Report", key="delete_report_btn"):
-            st.session_state["confirm_delete_report"] = True
-            
-        if st.session_state.get("confirm_delete_report"):
-            st.error(f"Are you sure you want to permanently delete the report for {selected_date_str}?")
+        if st.button("🗑️ Delete this Report", key="delete_rep_report_btn"):
+            st.session_state["confirm_delete_rep_report"] = True
+
+        if st.session_state.get("confirm_delete_rep_report"):
+            st.error(f"Are you sure you want to permanently delete the report for {st.session_state['rep_report_date']}?")
             dc1, dc2 = st.columns([1, 6], vertical_alignment="bottom")
             with dc1:
                 st.markdown('<span class="delete-target"></span>', unsafe_allow_html=True)
                 if st.button("✅ Yes, delete it"):
                     with st.spinner("Deleting..."):
                         sheet2 = get_sheets()
-                        _delete_records(sheet2, "Rep_Report", "Date", selected_date_str)
+                        _delete_records(sheet2, "Rep_Report", "Date", st.session_state["rep_report_date"])
                         _delete_records(sheet2, "Rep_Weekly", "Month", selected_month_str)
-                        st.session_state["confirm_delete_report"] = False
-                        save_and_refresh(f"🗑️ Report for {selected_date_str} successfully deleted!")
+
+                        st.session_state.pop("rep_master_table", None)
+                        st.session_state.pop("rep_report_date", None)
+                        st.session_state.pop("rep_weekly_table", None)
+                        st.session_state["rep_source"] = None
+                        st.session_state["rep_weekly_source"] = None
+                        st.session_state["confirm_delete_rep_report"] = False
+
+                        fetch_existing_reports.clear()
+
+                        msg_placeholder = st.empty()
+                        msg_placeholder.success(f"🗑️ Report for {selected_date_str} successfully deleted!")
+                        time.sleep(2)
+                        msg_placeholder.empty()
+                        st.rerun()
             with dc2:
                 st.markdown('<span class="cancel-target"></span>', unsafe_allow_html=True)
                 if st.button("Cancel"):
-                    st.session_state["confirm_delete_report"] = False
+                    st.session_state["confirm_delete_rep_report"] = False
                     st.rerun()
-
-    else:
-        st.info("No report exists for the selected date. Click the button below to generate and save one.")
-        if st.button("▶ Calculate & Save Report", type="primary"):
-            with st.spinner("Calculating and Saving to Database..."):
-                try:
-                    clear_raw_cache()
-                    master_table = build_master_table(selected_date_str)
-                    weekly_table = build_weekly_breakdown(selected_date_str)
-                    
-                    sheet2 = get_sheets()
-                    save_report_to_sheet(sheet2, master_table, selected_date_str)
-                    save_weekly_report_to_sheet(sheet2, weekly_table, selected_month_str)
-                    
-                    fetch_existing_reports.clear()
-                    save_and_refresh(f"✅ Report for '{selected_date_str}' successfully calculated and saved!")
-                except Exception as e:
-                    st.error(f"Error occurred during calculation/saving: {e}")
 
 if __name__ == "__main__":
     show()

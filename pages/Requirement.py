@@ -11,6 +11,7 @@ import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 
 def show():
+    # STREAMLIT_CHUNK:Initializing connection...
     # ============================================================
     # 1. CONNECTION
     # ============================================================
@@ -33,6 +34,7 @@ def show():
         sheet2 = client.open("Sales data2")
         return sheet1, sheet2
 
+    # STREAMLIT_CHUNK:Loading raw data...
     # ============================================================
     # 2. LOAD RAW DATA (cached, refreshed based on ttl)
     # ============================================================
@@ -65,6 +67,7 @@ def show():
         msg_placeholder.empty()
         st.rerun()
 
+    # STREAMLIT_CHUNK:Defining calculations...
     # ============================================================
     # 3. CALCULATION
     # ============================================================
@@ -249,6 +252,7 @@ def show():
         
         return master_table
 
+    # STREAMLIT_CHUNK:Building weekly breakdown...
     def build_weekly_breakdown(selected_date_str: str, items_master: pd.DataFrame) -> pd.DataFrame:
         _, sales_day_book, _, _, _ = load_raw_data()
 
@@ -304,6 +308,7 @@ def show():
         weekly_table = weekly_table[id_cols + week_cols + ["Total"]]
         return weekly_table
 
+    # STREAMLIT_CHUNK:Styling dataframes...
     def style_dataframe(df: pd.DataFrame, is_weekly=False):
         df_display = df.copy()
         
@@ -334,7 +339,8 @@ def show():
         if not is_weekly:
             def highlight_rows(row):
                 styles = [''] * len(row)
-                # 🚀 'Forecast Achievement %' ලෙස නම වෙනස් කර ඇත
+                
+                # 🚀 Changed from 'forecast_achivement %' to 'Forecast Achievement %'
                 if 'Forecast Achievement %' in row.index:
                     ach_idx = row.index.get_loc('Forecast Achievement %')
                     ach_val = safe_get_float(row['Forecast Achievement %'])
@@ -362,7 +368,7 @@ def show():
                         if bal_val >= 0: styles[bal_idx] = 'background-color: #E2F0CB !important; color: #2D5A27 !important; font-weight: bold;'
                         else: styles[bal_idx] = 'background-color: #FFD1D1 !important; color: #900000 !important; font-weight: bold;'
                 
-                # 🚀 'Sale Qty' ලෙස නම වෙනස් කර ඇත
+                # 🚀 Changed from 'Qty' to 'Sale Qty'
                 if 'Sale Qty' in row.index and 'Forecast Qty' in row.index:
                     qty_idx = row.index.get_loc('Sale Qty')
                     qty_val = safe_get_float(row['Sale Qty'])
@@ -377,7 +383,6 @@ def show():
                 return styles
             styler = styler.apply(highlight_rows, axis=1)
 
-        # 🚀 Table Heading වලට තද නිල් පසුබිමක් සහ සුදු අකුරු ලබාදීම (Web සහ PDF)
         styler = styler.set_table_styles([
             {'selector': 'table', 'props': [('width', '100%'), ('border-collapse', 'collapse')]},
             {'selector': 'th', 'props': [('background-color', '#00245E'), ('color', '#FFFFFF'), ('text-align', 'center'), ('padding', '10px'), ('border', '1px solid #ADE8F4'), ('white-space', 'nowrap')]},
@@ -392,37 +397,14 @@ def show():
         return styler
 
     def generate_pdf_or_html(styler, title, date_str):
-        try: from weasyprint import HTML as _WeasyHTML
-        except ImportError: _WeasyHTML = None
+        try: import pdfkit
+        except ImportError: pdfkit = None
             
         try:
             with open("logo.png", "rb") as image_file:
                 logo_base64 = base64.b64encode(image_file.read()).decode()
             img_tag = f'<img src="data:image/png;base64,{logo_base64}" style="height: 55px;" />'
         except: img_tag = ''
-
-        # 🚀 Explicit column widths (colgroup) so the table can NEVER overflow the page —
-        # every column gets a fixed % width that always sums to exactly 100%, instead of
-        # relying on the PDF engine to auto-distribute widths (which was still letting the
-        # table run past the page edge for wide tables).
-        n_cols = len(styler.data.columns)
-        first_w, second_w = 6.0, 16.0
-        if n_cols > 2:
-            other_w = (100.0 - first_w - second_w) / (n_cols - 2)
-            col_widths = [first_w, second_w] + [other_w] * (n_cols - 2)
-        elif n_cols == 2:
-            col_widths = [first_w, 100.0 - first_w]
-        elif n_cols == 1:
-            col_widths = [100.0]
-        else:
-            col_widths = []
-        colgroup_html = "<colgroup>" + "".join(
-            f'<col style="width:{w:.4f}%;">' for w in col_widths
-        ) + "</colgroup>"
-
-        table_html = styler.to_html()
-        table_tag_end = table_html.find(">", table_html.find("<table")) + 1
-        table_html = table_html[:table_tag_end] + colgroup_html + table_html[table_tag_end:]
 
         html_content = f"""
         <!DOCTYPE html>
@@ -435,24 +417,11 @@ def show():
                 body {{ font-family: 'Helvetica', 'Arial', sans-serif; color: #03045E; margin: 0; background-color: #ffffff; }}
                 table.header-table {{ width: 100%; background-color: #00245E; color: white; border-bottom: 5px solid #DE9C40; border-radius: 8px 8px 0 0; margin-bottom: 15px; border-collapse: collapse; }}
                 table.header-table td {{ border: none; padding: 15px; background-color: #00245E; text-align: left; vertical-align: middle; }}
-                .info-section {{ background-color: #CAF0F8; padding: 15px 20px; border-left: 6px solid #0096C7; margin-bottom: 15px; border-radius: 4px; }}
-                
-                /* 🚀 PDF Headers විශාල කිරීම */
-                .info-section h3 {{ margin: 0; color: #023E8A; font-size: 18px; }}
-                
-                /* 🚀 PDF Data Table Styles — table-layout: fixed + an explicit <colgroup> (added
-                   above) locks every column to a fixed % of the page width so the table can
-                   never overflow; word-break: break-all guarantees even long unbroken numbers
-                   wrap instead of pushing a column wider than its assigned share. */
-                table.dataframe {{ width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px !important; margin-top: 10px; font-family: 'Arial', sans-serif; }}
-                table.dataframe th, table.dataframe td {{ border: 1px solid #ADE8F4 !important; padding: 5px 4px; text-align: right; white-space: normal !important; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; }}
-                table.dataframe th {{ background-color: #00245E !important; color: white !important; text-align: center !important; font-weight: bold; word-break: normal; }}
-                table.dataframe td:nth-child(2) {{ text-align: left; }}
-                table.dataframe tbody tr:nth-child(even) {{ background-color: #F8FDFF !important; }}
-                table.dataframe tbody tr:nth-child(odd) {{ background-color: #FFFFFF !important; }}
-                
-                /* Ensure Background Colors Print */
-                * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }}
+                .info-section {{ background-color: #CAF0F8; padding: 12px 20px; border-left: 6px solid #0096C7; margin-bottom: 15px; border-radius: 4px; }}
+                .info-section h3 {{ margin: 0; color: #023E8A; font-size: 14px; }}
+                table {{ width: 100%; border-collapse: collapse; font-size: 11px !important; table-layout: auto; }}
+                th, td {{ border: 1px solid #ADE8F4; padding: 6px 8px; text-align: right; white-space: nowrap; }}
+                th {{ background-color: #03045E !important; color: white !important; text-align: center; font-weight: bold; }}
             </style>
         </head>
         <body>
@@ -465,45 +434,40 @@ def show():
             <div class="info-section">
                 <table style="width: 100%; border: none;">
                     <tr>
-                        <td style="text-align: left; border: none; padding: 0;"><h3>Department: Sales & Marketing</h3></td>
+                        <td style="text-align: left; border: none; padding: 0;"><h3>Department: Sales & Admin</h3></td>
                         <td style="text-align: center; border: none; padding: 0;"><h3>Report: {title}</h3></td>
                         <td style="text-align: right; border: none; padding: 0;"><h3>Date: {date_str}</h3></td>
                     </tr>
                 </table>
             </div>
-            
-            <!-- 🚀 PDF එකේ වර්ණ වල තේරුම (Legend) නිවැරදිව පෙන්වීමට Table එකක් යොදා ගැනීම -->
-            <table style="width: 100%; border: none; margin-bottom: 15px; font-size: 14px; font-weight: bold; color: #03045E;">
-                <tr>
-                    <td style="text-align: right; border: none; padding: 0;">
-                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #D4EDDA; border: 1px solid #155724; vertical-align: middle;"></span><span style="vertical-align: middle;"> Target &ge; 100% &nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #FFF3CD; border: 1px solid #856404; vertical-align: middle;"></span><span style="vertical-align: middle;"> 75% - 99% &nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #FFE8CC; border: 1px solid #A04000; vertical-align: middle;"></span><span style="vertical-align: middle;"> 50% - 74% &nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #F8D7DA; border: 1px solid #721C24; vertical-align: middle;"></span><span style="vertical-align: middle;"> &lt; 50% &nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #E2F0CB; border: 1px solid #2D5A27; vertical-align: middle;"></span><span style="vertical-align: middle;"> Balance &ge; 0 &nbsp;&nbsp;&nbsp;</span>
-                        <span style="display: inline-block; width: 14px; height: 14px; background-color: #FFD1D1; border: 1px solid #900000; vertical-align: middle;"></span><span style="vertical-align: middle;"> Balance &lt; 0</span>
-                    </td>
-                </tr>
-            </table>
-            
-            {table_html}
+            <div style="display: flex; gap: 15px; margin-bottom: 10px; font-size: 11px; font-weight: bold; justify-content: flex-end; color: #03045E;">
+                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #D4EDDA; border: 1px solid #155724;"></div> Target &ge; 100%</div>
+                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #FFF3CD; border: 1px solid #856404;"></div> 75% - 99%</div>
+                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #FFE8CC; border: 1px solid #A04000;"></div> 50% - 74%</div>
+                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #F8D7DA; border: 1px solid #721C24;"></div> &lt; 50%</div>
+                <div style="display: flex; align-items: center; gap: 5px; margin-left:10px;"><div style="width: 12px; height: 12px; background-color: #E2F0CB; border: 1px solid #2D5A27;"></div> Balance &ge; 0</div>
+                <div style="display: flex; align-items: center; gap: 5px;"><div style="width: 12px; height: 12px; background-color: #FFD1D1; border: 1px solid #900000;"></div> Balance &lt; 0</div>
+            </div>
+            {styler.to_html()}
         </body>
         </html>
         """
         
-        # 🚀 Page size/orientation/margin are already set via the @page CSS rule
-        # inside html_content above, so weasyprint just needs the HTML string.
-        if _WeasyHTML:
+        options = {
+            'page-size': 'A4', 'orientation': 'Landscape', 'margin-top': '0.3in', 'margin-right': '0.3in',
+            'margin-bottom': '0.3in', 'margin-left': '0.3in', 'encoding': "UTF-8", 'enable-local-file-access': None,
+            'zoom': 1.0, 'dpi': 300, 'no-outline': None
+        }
+        
+        if pdfkit:
             try:
-                pdf_bytes = _WeasyHTML(string=html_content).write_pdf()
+                pdf_bytes = pdfkit.from_string(html_content, False, options=options)
                 return pdf_bytes, "pdf", "application/pdf"
-            except Exception as e:
-                st.error(f"⚠️ PDF Error: {e}")
-        else:
-            st.error("⚠️ 'weasyprint' library is not installed!")
-            
+            except Exception: pass 
+        
         return html_content.encode('utf-8'), "html", "text/html"
 
+    # STREAMLIT_CHUNK:Defining sheet helpers...
     # ============================================================
     # 4. SAVE / LOAD / DELETE helpers
     # ============================================================
@@ -650,6 +614,7 @@ def show():
 
         return df
 
+    # STREAMLIT_CHUNK:Configuring UI...
     # ============================================================
     # 5. STREAMLIT UI
     # ============================================================
@@ -676,9 +641,7 @@ def show():
             min-height: 85vh !important; 
         }
         h1, h2, h3 { color: var(--c-900) !important; }
-        [data-testid="stDataFrame"] {
-            border: 1px solid #D1E5EB; border-radius: 8px; box-shadow: 0 4px 15px rgba(3, 4, 94, 0.08); background-color: white; padding: 5px;
-        }
+        
         button[kind="primary"] { background-color: #03045E !important; color: white !important; border-radius: 6px !important; font-weight: 600 !important; }
         button[kind="primary"]:hover { background-color: #0077B6 !important; }
         button[kind="secondary"] { background-color: #0096C7 !important; color: white !important; border-color: #0096C7 !important; border-radius: 6px !important; }
@@ -725,10 +688,11 @@ def show():
         
         .table-container table {
             width: 100%;
-            border-collapse: separate !important;
+            border-collapse: collapse !important;
             border-spacing: 0;
             font-family: 'Arial', sans-serif;
             font-size: 13px;
+            border: 1px solid #ADE8F4 !important;
         }
         .table-container th {
             position: sticky;
@@ -739,16 +703,19 @@ def show():
             color: #FFFFFF !important;
             font-weight: 900;
             background-color: #00245e !important;
-            border-bottom: 2px solid #0077B6 !important;
-            border-right: 1px solid #0077B6 !important;
+            border: 1px solid #ADE8F4 !important;
         }
         .table-container td {
-            border-bottom: 1px solid #ADE8F4 !important;
-            border-right: 1px solid #ADE8F4 !important;
+            border: 1px solid #ADE8F4 !important;
             padding: 10px 8px;
             white-space: nowrap;
         }
-        .table-container th:last-child, .table-container td:last-child { border-right: none !important; }
+        .table-container tbody tr:nth-child(even) {
+            background-color: #F8FDFF !important;
+        }
+        .table-container tbody tr:nth-child(odd) {
+            background-color: #FFFFFF !important;
+        }
         .table-container tbody tr:hover td {
             background-color: #EAF8FF !important;
             transition: 0.2s;
@@ -758,7 +725,6 @@ def show():
 
     st.title("Production Requirement Report")
     
-    # 🚀 වෙනස: ඉහළින් Date Picker එක පමණක් පෙන්වීම
     col1, col2 = st.columns([2, 5], vertical_alignment="bottom")
     with col1:
         selected_date = st.date_input("Select Date:", value=datetime.date.today())
@@ -852,7 +818,6 @@ def show():
                     st.rerun()
 
     else:
-        # 🚀 වෙනස: Report එකක් නැති විට පහළින් එකම බොත්තමක් පෙන්වීම
         st.info("No report exists for the selected date. Click the button below to generate and save one.")
         if st.button("▶ Calculate & Save Report", type="primary"):
             with st.spinner("Calculating and Saving to Database..."):
