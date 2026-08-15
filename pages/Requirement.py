@@ -392,8 +392,8 @@ def show():
         return styler
 
     def generate_pdf_or_html(styler, title, date_str):
-        try: import pdfkit
-        except ImportError: pdfkit = None
+        try: from weasyprint import HTML as _WeasyHTML
+        except ImportError: _WeasyHTML = None
             
         try:
             with open("logo.png", "rb") as image_file:
@@ -466,26 +466,16 @@ def show():
         </html>
         """
         
-        options = {
-            'page-size': 'A4', 'orientation': 'Landscape', 'margin-top': '0.3in', 'margin-right': '0.3in',
-            'margin-bottom': '0.3in', 'margin-left': '0.3in', 'encoding': "UTF-8", 'enable-local-file-access': None,
-            'zoom': 1.0, 'dpi': 300, 'no-outline': None
-        }
-        
-        if pdfkit:
+        # 🚀 Page size/orientation/margin are already set via the @page CSS rule
+        # inside html_content above, so weasyprint just needs the HTML string.
+        if _WeasyHTML:
             try:
-                config = None
-                # 🚀 Windows සඳහා wkhtmltopdf path configuration
-                if platform.system() == "Windows":
-                    path_wkhtmltopdf = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
-                    config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
-                    
-                pdf_bytes = pdfkit.from_string(html_content, False, options=options, configuration=config)
+                pdf_bytes = _WeasyHTML(string=html_content).write_pdf()
                 return pdf_bytes, "pdf", "application/pdf"
-            except Exception as e: 
-                st.error(f"⚠️ PDF Error: {e}") 
+            except Exception as e:
+                st.error(f"⚠️ PDF Error: {e}")
         else:
-            st.error("⚠️ 'pdfkit' library is not installed!")
+            st.error("⚠️ 'weasyprint' library is not installed!")
             
         return html_content.encode('utf-8'), "html", "text/html"
 
