@@ -401,6 +401,29 @@ def show():
             img_tag = f'<img src="data:image/png;base64,{logo_base64}" style="height: 55px;" />'
         except: img_tag = ''
 
+        # 🚀 Explicit column widths (colgroup) so the table can NEVER overflow the page —
+        # every column gets a fixed % width that always sums to exactly 100%, instead of
+        # relying on the PDF engine to auto-distribute widths (which was still letting the
+        # table run past the page edge for wide tables).
+        n_cols = len(styler.data.columns)
+        first_w, second_w = 6.0, 16.0
+        if n_cols > 2:
+            other_w = (100.0 - first_w - second_w) / (n_cols - 2)
+            col_widths = [first_w, second_w] + [other_w] * (n_cols - 2)
+        elif n_cols == 2:
+            col_widths = [first_w, 100.0 - first_w]
+        elif n_cols == 1:
+            col_widths = [100.0]
+        else:
+            col_widths = []
+        colgroup_html = "<colgroup>" + "".join(
+            f'<col style="width:{w:.4f}%;">' for w in col_widths
+        ) + "</colgroup>"
+
+        table_html = styler.to_html()
+        table_tag_end = table_html.find(">", table_html.find("<table")) + 1
+        table_html = table_html[:table_tag_end] + colgroup_html + table_html[table_tag_end:]
+
         html_content = f"""
         <!DOCTYPE html>
         <html>
@@ -417,12 +440,14 @@ def show():
                 /* 🚀 PDF Headers විශාල කිරීම */
                 .info-section h3 {{ margin: 0; color: #023E8A; font-size: 18px; }}
                 
-                /* 🚀 PDF Data Table Styles — table-layout: fixed keeps the table locked to
-                   100% of the page width so no column (especially the last one) ever gets
-                   cropped; long text wraps onto a 2nd line instead of pushing the table wider. */
-                table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 10px !important; table-layout: fixed; margin-top: 10px; font-family: 'Arial', sans-serif; }}
-                table.dataframe th, table.dataframe td {{ border: 1px solid #ADE8F4 !important; padding: 6px 5px; text-align: right; white-space: normal !important; word-wrap: break-word; overflow-wrap: break-word; }}
-                table.dataframe th {{ background-color: #00245E !important; color: white !important; text-align: center !important; font-weight: bold; }}
+                /* 🚀 PDF Data Table Styles — table-layout: fixed + an explicit <colgroup> (added
+                   above) locks every column to a fixed % of the page width so the table can
+                   never overflow; word-break: break-all guarantees even long unbroken numbers
+                   wrap instead of pushing a column wider than its assigned share. */
+                table.dataframe {{ width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 9px !important; margin-top: 10px; font-family: 'Arial', sans-serif; }}
+                table.dataframe th, table.dataframe td {{ border: 1px solid #ADE8F4 !important; padding: 5px 4px; text-align: right; white-space: normal !important; word-wrap: break-word; overflow-wrap: break-word; word-break: break-all; }}
+                table.dataframe th {{ background-color: #00245E !important; color: white !important; text-align: center !important; font-weight: bold; word-break: normal; }}
+                table.dataframe td:nth-child(2) {{ text-align: left; }}
                 table.dataframe tbody tr:nth-child(even) {{ background-color: #F8FDFF !important; }}
                 table.dataframe tbody tr:nth-child(odd) {{ background-color: #FFFFFF !important; }}
                 
@@ -461,7 +486,7 @@ def show():
                 </tr>
             </table>
             
-            {styler.to_html()}
+            {table_html}
         </body>
         </html>
         """
