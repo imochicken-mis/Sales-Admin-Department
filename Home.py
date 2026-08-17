@@ -505,8 +505,6 @@ def main():
 
     # Format the page name
     def format_page_name(name):
-        if name == "Home":
-            return "KPI" # For Home page, display as "KPI"
         if name == "dashboard":
             return "Production Requirement" # For dashboard page, display as "Production requirement"
         if name == "Requirement":
@@ -520,7 +518,7 @@ def main():
         clean_name = re.sub(r'^[\d_]+', '', name)
         return clean_name.replace("_", " ").title()
     
-    kpi_pages = [p for p in page_options if p in ["Home"]]
+    kpi_pages = [p for p in page_options if p in ["Home", "KPI"]]
     data_entry_pages = [p for p in page_options if p in ["1sales_day_book" , "2Inventory", "3Monthly_Forecast", "4Working_days", "5Rep_Target","1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation","1Age_Receivable","Issued_Qty","Rep_Variance","Sales_Return","Shop_Return"]]
     report_pages = [p for p in page_options if p in ["Requirement", "rep_target","2Cash_Collection_and_Deposit_Report","Variance_Report"]]
     dashboard_pages = [p for p in page_options if p in ["dashboard","dashboard_2"]]

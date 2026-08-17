@@ -78,6 +78,8 @@ def get_allowed_pages(role):
             return ["Issued_Qty","Rep_Variance","Sales_Return","Shop_Return"]
     if role in ["admin1"]:
             return ["Settings"]
+    if role in ["KpiAdmin"]:
+            return ["KPI"]
     return []
 
 # ---------- Google Sheets Connection ----------
