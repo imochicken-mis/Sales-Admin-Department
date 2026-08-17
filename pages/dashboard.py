@@ -482,8 +482,11 @@ def show():
         rep_df = rep_df_all[rep_df_all["Date"] == latest_date].copy()
 
         # 🚀 CLEAN NUMERIC DATA & FIX "-" & COMMA ERRORS SAFELY
-        for col in ["Qty", "Forecast Qty"]:
-            if col in req_df.columns:
+        qty_col = next((c for c in ["Sale Qty", "Qty"] if c in req_df.columns), None)
+        fc_col = next((c for c in ["Forecast Qty", "Forecast"] if c in req_df.columns), None)
+
+        for col in [qty_col, fc_col]:
+            if col and col in req_df.columns:
                 req_df[col] = req_df[col].astype(str).str.replace(',', '', regex=False).replace(r'^\s*-\s*$', '0', regex=True)
                 req_df[col] = pd.to_numeric(req_df[col], errors='coerce').fillna(0)
                 
@@ -603,15 +606,15 @@ def show():
 
         with r1c2:
             # Sales by Product Group (Pie)
-            if "Product Code" in req_df.columns and "Qty" in req_df.columns:
+            if "Product Code" in req_df.columns and qty_col:
                 req_df["Category"] = req_df["Product Code"].apply(get_category)
-                cat_sales = req_df.groupby("Category")["Qty"].sum().reset_index()
+                cat_sales = req_df.groupby("Category")[qty_col].sum().reset_index()
                 
                 # Dark Blue to Light Blue palette
                 color_map = {"Chicken": "#03045E", "Potion": "#0077B6", "Easy": "#48CAE4", "Other": "#ADE8F4"}
                 
                 fig_pie = px.pie(
-                    cat_sales, names="Category", values="Qty", hole=0.6,
+                    cat_sales, names="Category", values=qty_col, hole=0.6,
                     color="Category", color_discrete_map=color_map
                 )
                 fig_pie.update_traces(textinfo='percent+label', textfont_size=14, marker=dict(line=dict(color='#FFFFFF', width=2)))
@@ -624,22 +627,22 @@ def show():
         # ================== ROW 2 ==================
 
         # Item Wise: Forecast vs Actual with Secondary Axis for Achievement %
-        if "Qty" in req_df.columns and "Forecast Qty" in req_df.columns:
-            req_valid = req_df[(req_df["Qty"] > 0) | (req_df["Forecast Qty"] > 0)].sort_values("Qty", ascending=False).head(15).copy()
+        if qty_col and fc_col:
+            req_valid = req_df[(req_df[qty_col] > 0) | (req_df[fc_col] > 0)].sort_values(qty_col, ascending=False).head(15).copy()
             
             # අලුතින් එකතු කළ Achievement % ගණනය කිරීම
-            req_valid["Ach %"] = np.where(req_valid["Forecast Qty"] > 0, (req_valid["Qty"] / req_valid["Forecast Qty"]) * 100, 0)
+            req_valid["Ach %"] = np.where(req_valid[fc_col] > 0, (req_valid[qty_col] / req_valid[fc_col]) * 100, 0)
             
             fig_combo = go.Figure()
             
             # 1. Forecast Qty Bar
             fig_combo.add_trace(go.Bar(
                 x=req_valid["Item Name"], 
-                y=req_valid["Forecast Qty"], 
+                y=req_valid[fc_col], 
                 name="Forecast", 
                 marker_color="#03045E", 
                 opacity=0.9,
-                text=req_valid["Forecast Qty"].apply(lambda x: f"{x/1000:,.0f}k"), # අගයන් format කිරීම
+                text=req_valid[fc_col].apply(lambda x: f"{x/1000:,.0f}k"), # අගයන් format කිරීම
                 textposition="outside",
                 textfont=dict(
                     size=13,
@@ -651,11 +654,11 @@ def show():
             # 2. Actual Sales Bar
             fig_combo.add_trace(go.Bar(
                 x=req_valid["Item Name"], 
-                y=req_valid["Qty"], 
+                y=req_valid[qty_col], 
                 name="Actual Sales", 
                 marker_color="#0096C7", 
                 opacity=0.95,
-                text=req_valid["Qty"].apply(lambda x: f"{x/1000:,.0f}k"), # අගයන් format කිරීම
+                text=req_valid[qty_col].apply(lambda x: f"{x/1000:,.0f}k"), # අගයන් format කිරීම
                 textposition="outside",
                 textfont=dict(
                     size=13,
@@ -669,9 +672,15 @@ def show():
                 x=req_valid["Item Name"], 
                 y=req_valid["Ach %"], 
                 name="Achievement %", 
-                mode="lines+markers", 
+                type="scatter",
+                mode="lines+markers+text", 
                 yaxis="y2", # Secondary axis එකට සම්බන්ධ කිරීම
-                line=dict(color="#FFB703", width=3,  shape="spline"), # කැපී පෙනෙන කහ/තැඹිලි පාටක්
+                fill="tozeroy", 
+                fillcolor="rgba(255, 183, 3, 0.15)",
+                text=req_valid["Ach %"].apply(lambda x: f"{x:,.1f}%" if x > 0 else ""),
+                textposition="top center",
+                textfont=dict(color="#FFB703", size=13, family="Arial Black"),
+                line=dict(color="#FFB703", width=3, shape="spline"),
                 marker=dict(size=8, color="#FFFFFF", line=dict(width=2, color="#000000"))
             ))
             

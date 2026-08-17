@@ -67,13 +67,15 @@ def authenticate(username, password):
 
 def get_allowed_pages(role):
     if role == "admin":
-        return ["Requirement", "dashboard","rep_target","2Cash_Collection_and_Deposit_Report","dashboard_2"]
+        return ["Requirement", "dashboard","rep_target","2Cash_Collection_and_Deposit_Report","dashboard_2","Variance_Report"]
     if role in ["user1"]:
         return ["1sales_day_book","2Inventory","3Monthly_Forecast","4Working_days","5Rep_Target"]
     if role in ["user2"]:
         return ["1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation"]
     if role in ["user3"]:
         return ["1Age_Receivable"]
+    if role in ["user4"]:
+            return ["Issued_Qty","Rep_Variance","Sales_Return","Shop_Return"]
     if role in ["admin1"]:
             return ["Settings"]
     return []
