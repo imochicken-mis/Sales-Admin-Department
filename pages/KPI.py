@@ -3,7 +3,7 @@ import streamlit.components.v1 as components
 
 def show():
     # Oyage Vercel link eka methanata danna
-    VERCEL_LINK = "https://kpi-vercel-app.vercel.app/"
+    VERCEL_LINK = "https://kpi-dashboard-gold-rho.vercel.app/"
     
     st.write("Redirecting to Dashboard...")
     
