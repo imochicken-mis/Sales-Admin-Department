@@ -96,6 +96,13 @@ def show():
 
     st.markdown("""
         <style>
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 2rem !important;
+            max-width: 98% !important;
+            overflow-x: hidden !important;
+            min-height: 85vh !important;
+            
         div[data-testid="stDateInput"] label p {
             font-family: 'Arial', sans-serif !important;
             font-weight: 600 !important;

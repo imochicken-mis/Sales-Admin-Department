@@ -10,7 +10,7 @@ from util import connect_to_sheets2, clear_sheet_cache
 
 def show():
     st.title("Production Requirement")
-    st.write("Welcome! This is your private area.")
+    st.write("Welcome, Pradeep...! This is your private area.")
     st.write("Here you can enter Daily Sales data.")
 
     # --- 1. SHEET CONNECTION ---
@@ -132,6 +132,12 @@ def show():
     # --- Custom CSS for Date Input Box ---
     st.markdown("""
         <style>
+        .block-container {
+            padding-top: 1rem !important;
+            padding-bottom: 2rem !important;
+            max-width: 98% !important;
+            overflow-x: hidden !important;
+            min-height: 85vh !important;
         /* Select date font and style */
         div[data-testid="stDateInput"] label p {
             font-family: 'Arial', sans-serif !important; /* Select font */

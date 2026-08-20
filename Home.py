@@ -1,4 +1,4 @@
-# Home.py (Complete updated version)
+# Home.py (Complete updated version with Sticky Sidebar Header)
 import streamlit as st
 from util import authenticate, get_allowed_pages
 import importlib
@@ -66,6 +66,7 @@ if not os.path.exists("service_account.json"):
     except Exception as e:
         st.error(f"⚠️ Error reading secrets: {e}")
         st.stop()
+        
 # ---------- Login form (main screen) ----------
 def show_login_form():
     def get_base64_file(file_path):
@@ -159,8 +160,8 @@ def show_login_form():
         }
 
         /* ==========================================
-           4. "ACCESS GRANTED" ANIMATION CSS
-           ========================================== */
+            4. "ACCESS GRANTED" ANIMATION CSS
+            ========================================== */
         .success-box {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -204,8 +205,8 @@ def show_login_form():
         }
 
         /* ==========================================
-           5. "ACCESS DENIED" (ERROR) ANIMATION CSS
-           ========================================== */
+            5. "ACCESS DENIED" (ERROR) ANIMATION CSS
+            ========================================== */
         .error-box {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -266,8 +267,6 @@ def show_login_form():
     
     st.markdown(css_code + video_html, unsafe_allow_html=True)
 
-    st.markdown(css_code + video_html, unsafe_allow_html=True)
-
     st.markdown("<div style='margin-top: 15vh;'></div>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
@@ -308,6 +307,7 @@ def show_login_form():
             else:
                 st.session_state.login_status = "denied"
             st.rerun()
+            
 # ---------- Logout ----------
 def logout():
     if st.sidebar.button("🚪 Logout", use_container_width=True):
@@ -352,7 +352,10 @@ def main():
         st.session_state.username = st.session_state.pending_username
         st.session_state.role = st.session_state.pending_role
         allowed_pages = get_allowed_pages(st.session_state.role)
-        st.session_state.current_page = "Home" if st.session_state.role == "admin" else (allowed_pages[0] if allowed_pages else "Home")
+        if "Requirement" in allowed_pages:
+            st.session_state.current_page = "Requirement"
+        else:
+            st.session_state.current_page = allowed_pages[0] if allowed_pages else "dashboard" # or any fallback
 
         st.session_state.login_status = ""
         st.rerun()
@@ -391,9 +394,6 @@ def main():
         st.session_state.login_status = ""
         st.rerun()
 
-    if not st.session_state.get("logged_in", False):
-        show_login_form()
-        return
     if not st.session_state.get("logged_in", False):
         show_login_form()
         return
@@ -470,37 +470,50 @@ def main():
         hr {
             border-top: 2px dashed #90E0EF !important;
         }
+
+        /* 🚀 STICKY SIDEBAR HEADER CSS */
+        .sticky-sidebar-header {
+            position: -webkit-sticky; /* For Safari */
+            position: sticky;
+            top: 0;
+            background-color: #00245E; /* Sidebar Background Color */
+            z-index: 999;
+            padding-bottom: 10px;
+            margin-top: -10px;
+        }
         </style>
     """, unsafe_allow_html=True)
 
-    col1, col2, col3 = st.sidebar.columns([1, 2.5, 1])
-    with col2:
-        try:
-            # If the logo.png file exists, display it in the sidebar
-            st.image("logo.png", use_container_width=True)
-        except Exception:
-            pass
-
 # ---------- Sidebar Content ----------
-    st.sidebar.markdown("<h3 style='text-align: center; color: #052b6c; font-weight: 900; margin-top: -10px; margin-bottom: 0px; border-bottom: none;'>IMO Chicken & Agro (Pvt) Ltd</h3>", unsafe_allow_html=True)
-    st.sidebar.markdown("<hr style='margin-top: 15px; margin-bottom: 15px; border-top: 2px solid #0096C7 !important;'>", unsafe_allow_html=True)
 
-    st.sidebar.markdown(f"<h3 style='color: #FFFFFF; font-size: 22px; font-weight: 700; margin-bottom: 0;'>👋 Welcome, {st.session_state.username}!</h3>", unsafe_allow_html=True)
-    
+    # 🚀 NEW: Sticky Container for Logo & Company Name
+    with st.sidebar.container():
+        st.markdown("<div class='sticky-sidebar-header'>", unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2.5, 1])
+        with col2:
+            try:
+                # If the logo.png file exists, display it in the sidebar
+                st.image("logo.png", use_container_width=True)
+            except Exception:
+                pass
+                
+        st.markdown("<h3 style='text-align: center; color: #FFFFFF; font-weight: 900; margin-top: -10px; margin-bottom: 0px; border-bottom: none;'>IMO Chicken & Agro (Pvt) Ltd</h3>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin-top: 15px; margin-bottom: 5px; border-top: 2px solid #0096C7 !important;'>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # User Welcome Section (Scrolls beneath the sticky header)
+    st.sidebar.markdown(f"<h3 style='color: #FFFFFF; font-size: 22px; font-weight: 700; margin-bottom: 0; margin-top: 10px;'>👋 Welcome, {st.session_state.username}!</h3>", unsafe_allow_html=True)
     st.sidebar.markdown(f"<p style='color: #FFFFFF; font-size: 16px; font-weight: 600; margin-top: 5px;'>Role: {st.session_state.role}</p>", unsafe_allow_html=True)
-    
     st.sidebar.markdown("---")
 
     allowed = get_allowed_pages(st.session_state.role)
     
-    # Only admin can access to Home
-    if st.session_state.role == "admin":
-        page_options = ["Home"] + allowed
-    else:
-        page_options = allowed
+    # page_options walin "Home" eka ain karanawa, habai navigation ekata thiyagannawa
+    page_options = allowed
     
     if st.session_state.current_page not in page_options:
-        st.session_state.current_page = page_options[0] if page_options else "Home"
+        st.session_state.current_page = page_options[0] if page_options else "Requirement"
         st.rerun()
 
     # Format the page name
@@ -518,7 +531,7 @@ def main():
         clean_name = re.sub(r'^[\d_]+', '', name)
         return clean_name.replace("_", " ").title()
     
-    kpi_pages = [p for p in page_options if p in ["Home", "KPI"]]
+    kpi_pages = [p for p in page_options if p in ["KPI"]]
     data_entry_pages = [p for p in page_options if p in ["1sales_day_book" , "2Inventory", "3Monthly_Forecast", "4Working_days", "5Rep_Target","1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation","1Age_Receivable","Issued_Qty","Rep_Variance","Sales_Return","Shop_Return"]]
     report_pages = [p for p in page_options if p in ["Requirement", "rep_target","2Cash_Collection_and_Deposit_Report","Variance_Report"]]
     dashboard_pages = [p for p in page_options if p in ["dashboard","dashboard_2"]]

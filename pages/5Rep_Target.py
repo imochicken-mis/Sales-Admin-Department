@@ -9,7 +9,7 @@ from gspread_dataframe import set_with_dataframe
 def show():
     st.title("Rep Target")
     st.write("Welcome, Pradeep...! This is your private area.")
-    st.write("Here you can enter data.")
+    st.write("Here you can enter Rep Target.")
     
     st.sidebar.markdown("---")
 

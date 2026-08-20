@@ -10,12 +10,7 @@ from util import connect_to_sheets
 # ============================================================
 # PDF/HTML GENERATOR FUNCTION
 # ============================================================
-def generate_pdf_or_html(table_html, date_str, kpi_data):
-    try:
-        import pdfkit
-    except ImportError:
-        pdfkit = None
-        
+def generate_html(table_html, date_str, kpi_data):
     try:
         with open("logo.png", "rb") as image_file:
             logo_base64 = base64.b64encode(image_file.read()).decode()
@@ -23,29 +18,20 @@ def generate_pdf_or_html(table_html, date_str, kpi_data):
     except:
         img_tag = ''
         
-    # KPI Section HTML for PDF (HTML Entities used to avoid syntax errors)
+    # KPI Section HTML
     kpi_html = f"""
     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-family: 'Helvetica', 'Arial', sans-serif;">
         <tr>
-            <!-- Card 1 -->
             <td style="width: 31%; background-color: #004b87; padding: 18px 10px; border-radius: 10px; text-align: center; color: white; border: 1px solid #004b87;">
                 <div style="color: #CAF0F8; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 6px;">Total Cash Collection</div>
                 <div style="color: #FFFFFF; font-size: 22px; font-weight: 900;">Rs. {kpi_data['cash']:,.2f}</div>
             </td>
-            
-            <!-- Gap -->
             <td style="width: 3.5%; background-color: white; border: none;"></td> 
-            
-            <!-- Card 2 -->
             <td style="width: 31%; background-color: #0060a8; padding: 18px 10px; border-radius: 10px; text-align: center; color: white; border: 1px solid #0060a8;">
                 <div style="color: #E0F7FA; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 6px;">Bank Deposit Amount</div>
                 <div style="color: #FFFFFF; font-size: 22px; font-weight: 900;">Rs. {kpi_data['deposit']:,.2f}</div>
             </td>
-            
-            <!-- Gap -->
             <td style="width: 3.5%; background-color: white; border: none;"></td> 
-            
-            <!-- Card 3 -->
             <td style="width: 31%; background-color: #1e5c34; padding: 18px 10px; border-radius: 10px; text-align: center; color: white; border: 1px solid #1e5c34;">
                 <div style="color: #D8F3DC; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 6px;">Total Balance</div>
                 <div style="color: #FFFFFF; font-size: 22px; font-weight: 900;">Rs. {kpi_data['balance']:,.2f}</div>
@@ -54,7 +40,7 @@ def generate_pdf_or_html(table_html, date_str, kpi_data):
     </table>
     """
 
-    # Full HTML Layout for PDF
+    # Full HTML Layout
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -69,7 +55,6 @@ def generate_pdf_or_html(table_html, date_str, kpi_data):
             .info-section {{ background-color: #CAF0F8; padding: 12px 20px; border-left: 6px solid #0096C7; margin-bottom: 15px; border-radius: 4px; }}
             .info-section h3 {{ margin: 0; color: #023E8A; font-size: 18px; }}
             
-            /* Table styling for PDF */
             table.report-table {{ width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }}
             table.report-table th, table.report-table td {{ border: 1px solid #ADE8F4; padding: 8px; text-align: right; }}
             table.report-table th {{ background-color: #00245e; color: white; text-align: center; font-weight: bold; }}
@@ -101,29 +86,7 @@ def generate_pdf_or_html(table_html, date_str, kpi_data):
     </html>
     """
     
-    options = {
-        'page-size': 'A4', 'orientation': 'Portrait', 'margin-top': '0.3in', 'margin-right': '0.3in',
-        'margin-bottom': '0.3in', 'margin-left': '0.3in', 'encoding': "UTF-8", 'enable-local-file-access': None
-    }
-    
-    if pdfkit:
-        try:
-            # Windows සඳහා සොෆ්ට්වෙයාර් එක තියෙන තැන කේතයට ලබා දීම
-            config = None
-            if platform.system() == "Windows":
-                # ඔබ wkhtmltopdf Install කළ තැන වෙනස් නම් මෙතන Path එක වෙනස් කරන්න
-                path_wkhtmltopdf = r'C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe'
-                config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
-            
-            # config එක සමග PDF එක සෑදීම
-            pdf_bytes = pdfkit.from_string(html_content, False, options=options, configuration=config)
-            return pdf_bytes, "pdf", "application/pdf"
-            
-        except Exception as e:
-            st.error(f"⚠️ PDF සෑදීමේ දෝෂයක්: {e}") 
-    else:
-        st.error("⚠️ 'pdfkit' library එක install කර නොමැත!")
-        
+    # HTML අගය පමණක් Return කිරීම
     return html_content.encode('utf-8'), "html", "text/html"
 
 # ============================================================
@@ -140,6 +103,7 @@ def show():
             overflow-x: hidden !important;
             min-height: 85vh !important;
         }
+
         [data-testid="stHeader"] { background: transparent !important; }
         
         div[data-testid="stDateInput"] label p, div[data-testid="stSelectbox"] label p {
@@ -368,8 +332,10 @@ def show():
                 
                 dep_date = row.get("Deposit Date", "")
                 
-                bank = str(row.get("Status", ""))
-                if bank.strip() == "" or bank == "nan":
+                # අලුත් Sheet එකට අනුව "Type" column එකෙන් දත්ත ගැනීම
+                bank = str(row.get("Type", "")).strip()
+                
+                if bank == "" or bank.lower() == "nan":
                     bank = "-"
 
                 table_inner_html += "<tr>"
@@ -403,7 +369,7 @@ def show():
         # STREAMLIT CHUNK: Download Button...
         col_btn1, col_btn2 = st.columns([8, 2])
         with col_btn2:
-            export_data, ext, mime = generate_pdf_or_html(table_inner_html, selected_date_str, kpi_data)
+            export_data, ext, mime = generate_html(table_inner_html, selected_date_str, kpi_data)
             # Streamlit shortcode for printer icon used here
             st.download_button(
                 label=f":printer: Download Report",

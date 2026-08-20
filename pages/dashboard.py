@@ -208,16 +208,27 @@ def load_dashboard_data():
         sh1 = connect_to_sheets()
         sh2 = connect_to_sheets2()
         
+        # 🚀 [අලුතින් එකතු කළ කොටස] Error නොපැමිණෙන ලෙස Data Load කිරීම
+        def safe_load(ws):
+            vals = ws.get_all_values()
+            if len(vals) > 1:
+                df = pd.DataFrame(vals[1:], columns=vals[0])
+                # Duplicate columns ඇත්නම් ඉවත් කිරීම
+                df = df.loc[:, ~df.columns.duplicated(keep="first")]
+                return df
+            return pd.DataFrame()
+
         req_ws = sh1.worksheet("Req_Report")
-        req_df = pd.DataFrame(req_ws.get_all_records())
+        req_df = safe_load(req_ws)
         
         rep_ws = sh2.worksheet("Rep_Report")
-        rep_df = pd.DataFrame(rep_ws.get_all_records())
+        rep_df = safe_load(rep_ws)
         
-        req_df.columns = req_df.columns.str.strip()
-        rep_df.columns = rep_df.columns.str.strip()
+        req_df.columns = req_df.columns.astype(str).str.strip()
+        rep_df.columns = rep_df.columns.astype(str).str.strip()
 
-        w_df = pd.DataFrame(sh1.worksheet("Working_Days").get_all_records())
+        w_ws = sh1.worksheet("Working_Days")
+        w_df = safe_load(w_ws)
 
         return req_df, rep_df, w_df
     except Exception as e:
@@ -229,8 +240,18 @@ def fetch_dashboard_kpi_raw_data():
     try:
         sh1 = connect_to_sheets()
         sh2 = connect_to_sheets2()
-        f_df = pd.DataFrame(sh1.worksheet("Forecast").get_all_records())
-        s_df = pd.DataFrame(sh2.worksheet("Sales_day_book").get_all_records())
+        
+        # 🚀 [අලුතින් එකතු කළ කොටස]
+        def safe_load(ws):
+            vals = ws.get_all_values()
+            if len(vals) > 1:
+                df = pd.DataFrame(vals[1:], columns=vals[0])
+                df = df.loc[:, ~df.columns.duplicated(keep="first")]
+                return df
+            return pd.DataFrame()
+
+        f_df = safe_load(sh1.worksheet("Forecast"))
+        s_df = safe_load(sh2.worksheet("Sales_day_book"))
         return f_df, s_df
     except Exception as e:
         st.error(f"Error loading KPI raw data: {e}")
@@ -261,45 +282,66 @@ plotly_config = {
     'staticPlot': False
 }
 
-def render_kpi_cards(total_target, total_sale, forecast_ach, active_reps, variance_to_target):
+def render_kpi_cards(total_target, total_sale, daily_avg, expected_days, worked_days, cumulative_target, variance_to_target):
     """Animate the KPI values from zero to their final values."""
     placeholder = st.empty()
     steps = 20
     var_color = "#146c2e" if variance_to_target >= 0 else "#D90429"
+    
     for step in range(steps + 1):
         progress = step / steps
         placeholder.markdown(f"""
-            <div class="kpi-container">
+            <style>
+                /* 🚀 අකුරු පල්ලෙහාට යන එක නවත්වන සහ කාඩ් වල ඉඩ හදන CSS */
+                .kpi-value {{
+                    font-size: 1.9rem !important; /* අකුරු වල සයිස් එක ටිකක් අඩු කළා */
+                    white-space: nowrap !important; /* පල්ලෙහාට කඩන් වැටෙන එක සම්පූර්ණයෙන්ම නවත්වයි */
+                }}
+                .kg-unit {{
+                    font-size: 1.6rem; /* 'kg' අකුරු ඉලක්කමට වඩා පොඩියට පෙන්වීමට */
+                    font-weight: 600;
+                    color: #03045e;
+                }}
+                .kpi-card {{
+                    padding: 1.2rem !important; /* කාඩ් 6ම එක පේළියට ගන්න ඇතුලේ ඉඩ (padding) ටිකක් අඩු කළා */
+                }}
+            </style>
+            
+            <div class="kpi-container" style="flex-wrap: nowrap; gap: 1rem;">
                 <div class="kpi-card" style="border-top-color: #023E8A;">
-                    <div class="kpi-title">Total Target</div>
-                    <div class="kpi-value"><span>{total_target * progress:,.0f} kg</span></div>
-                    <div class="kpi-sub" style="color: #0077B6;">Monthly Quota</div>
-                </div>
-                <div class="kpi-card" style="border-top-color: #03045E;">
-                    <div class="kpi-title">Total Sales (Up to Today)</div>
-                    <div class="kpi-value"><span>{total_sale * progress:,.0f} kg</span></div>
-                    <div class="kpi-sub" style="color: #0096C7;">Total Volume Sold</div>
+                    <div class="kpi-title">Monthly Target</div>
+                    <div class="kpi-value"><span>{total_target * progress:,.0f} <span class="kg-unit">kg</span></span></div>
+                    <div class="kpi-sub" style="color: #0077B6;">Total Quota</div>
                 </div>
                 <div class="kpi-card" style="border-top-color: #0077B6;">
-                    <div class="kpi-title">Daily Average Sale</div>
-                    <div class="kpi-value"><span>{forecast_ach * progress:,.1f} kg</span></div>
-                    <div class="kpi-sub" style="color: #0096C7;">Vs Monthly Target</div>
+                    <div class="kpi-title">Cumulative Target</div>
+                    <div class="kpi-value"><span>{cumulative_target * progress:,.0f} <span class="kg-unit">kg</span></span></div>
+                    <div class="kpi-sub" style="color: #0096C7;">Up to Selected Date</div>
                 </div>
-                <div class="kpi-card" style="border-top-color: #0096C7;">
-                    <div class="kpi-title">Active Reps</div>
-                    <div class="kpi-value"><span>{active_reps * progress:,.0f}</span></div>
-                    <div class="kpi-sub" style="color: #0077B6;">Engaged in Sales</div>
+                <div class="kpi-card" style="border-top-color: #03045E;">
+                    <div class="kpi-title">Actual Sales</div>
+                    <div class="kpi-value"><span>{total_sale * progress:,.0f} <span class="kg-unit">kg</span></span></div>
+                    <div class="kpi-sub" style="color: #0096C7;">Total Volume Sold</div>
                 </div>
                 <div class="kpi-card" style="border-top-color: #0096C7;">
                     <div class="kpi-title">Variance to Target</div>
-                    <div class="kpi-value"><span style="color: {var_color};">{variance_to_target * progress:,.0f} kg</span></div>
-                    <div class="kpi-sub" style="color: {var_color};">Sales - Day Target</div>
+                    <div class="kpi-value"><span style="color: {var_color};">{variance_to_target * progress:,.0f} <span class="kg-unit">kg</span></span></div>
+                    <div class="kpi-sub" style="color: {var_color};">Sales - Cumulative Target</div>
+                </div>
+                <div class="kpi-card" style="border-top-color: #00B4D8;">
+                    <div class="kpi-title">Daily Average</div>
+                    <div class="kpi-value"><span>{daily_avg * progress:,.1f} <span class="kg-unit">kg</span></span></div>
+                    <div class="kpi-sub" style="color: #0077B6;">Based on Worked Days</div>
+                </div>
+                <div class="kpi-card" style="border-top-color: #48CAE4;">
+                    <div class="kpi-title">Working Days</div>
+                    <div class="kpi-value"><span>{worked_days * progress:,.0f} / {expected_days:,.0f}</span></div>
+                    <div class="kpi-sub" style="color: #0077B6;">Worked / Expected</div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         if step < steps:
             time.sleep(0.025)
-
 def render_animated_chart(fig, height, animation_kind="default"):
     """Render a Plotly chart without scrollbars, animate smoothly, and replay on click."""
     def as_list(values):
@@ -440,7 +482,7 @@ def render_animated_chart(fig, height, animation_kind="default"):
 def show():
     apply_custom_css()
     
-    st.markdown("<h2 style='text-align: center; color: #03045E; font-weight: 800;'>📊 Monthly Overview Dashboard</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #03045E; font-weight: 800;'>📊 Monthly Overview</h2>", unsafe_allow_html=True)
     
     # Date Pickers
     today = datetime.now()
@@ -505,6 +547,8 @@ def show():
         selected_month_name = end_date.strftime("%B")
 
         Worked_Days = 1
+        Expected_Working_Days = 1 # 🚀 අලුත් විචල්‍යය
+        
         if not working_days_df.empty and "Year" in working_days_df.columns and "Month" in working_days_df.columns:
             # Year සහ Month අනුව දත්ත Filter කිරීම
             wd_filtered = working_days_df[
@@ -512,13 +556,20 @@ def show():
                 (working_days_df["Month"].astype(str) == selected_month_name)
             ]
             
-            # Filter වූ දත්ත ඇත්නම් එයින් අගය ලබාගැනීම
-            if not wd_filtered.empty and "Worked Days" in wd_filtered.columns:
-                val = wd_filtered["Worked Days"].iloc[0]
-                if pd.notna(val) and str(val).strip() != "":
-                    Worked_Days = int(val)
-                    if Worked_Days == 0: 
-                        Worked_Days = 1
+            if not wd_filtered.empty:
+                # 1. Expected Working Days ලබාගැනීම
+                if "Working Days" in wd_filtered.columns:
+                    val_exp = wd_filtered["Working Days"].iloc[0]
+                    if pd.notna(val_exp) and str(val_exp).strip() != "":
+                        Expected_Working_Days = int(val_exp)
+                
+                # 2. Worked Days ලබාගැනීම
+                if "Worked Days" in wd_filtered.columns:
+                    val_work = wd_filtered["Worked Days"].iloc[0]
+                    if pd.notna(val_work) and str(val_work).strip() != "":
+                        Worked_Days = int(val_work)
+                        if Worked_Days == 0: 
+                            Worked_Days = 1
            
 
         total_target = 0
@@ -581,12 +632,22 @@ def show():
         active_reps = len(rep_df[rep_df["Sales"] > 0]) if "Sales" in rep_df.columns else 0
 
         # Pass calculated values to KPI Cards
-        render_kpi_cards(total_target, total_sale, daily_avg, active_reps,variance_to_target)
+        render_kpi_cards(total_target, total_sale, daily_avg, Expected_Working_Days, Worked_Days, Day_target, variance_to_target)
 
         # ================== ROW 1 ==================
         r1c1, r1c2 = st.columns([1, 1])
 
         with r1c1:
+            # 🚀 Achievement % එක අනුව Gauge Bar එකේ පාට තීරණය කිරීම
+            if overall_ach >= 100:
+                gauge_color = "#28a745"  # Green (ඉලක්කය සපුරා ඇත)
+            elif overall_ach >= 75:
+                gauge_color = "#FFB703"  # Yellow/Orange (ඉලක්කයට ආසන්නයි)
+            elif overall_ach >= 50:
+                gauge_color = "#F4A261"  # Light Orange (සාමාන්‍යයි)
+            else:
+                gauge_color = "#D90429"  # Red (අඩුයි)
+
             # Overall Target Achievement Gauge
             fig_gauge = go.Figure(go.Indicator(
                 mode="gauge+number+delta",
@@ -595,9 +656,15 @@ def show():
                 delta={'reference': 100, 'position': "top", 'font': {'color': "#0077B6"}},
                 gauge={
                     'axis': {'range': [None, max(100, overall_ach)], 'visible': False},
-                    'bar': {'color': "#0096C7", 'thickness': 0.8},
-                    'bgcolor': "#CAF0F8",
+                    'bar': {'color': gauge_color, 'thickness': 0.8}, # 🚀 මෙතනට dynamic color එක දුන්නා
+                    'bgcolor': "#EAF8FF",
                     'shape': "angular",
+                    # 🚀 (Optional) පිටිපස්සේ Background එකටත් පාට කෑලි 3ක් දැම්මා ලස්සන වෙන්න
+                    'steps': [
+                        {'range': [0, 50], 'color': "rgba(217, 4, 41, 0.1)"},   # Light Red
+                        {'range': [50, 75], 'color': "rgba(255, 183, 3, 0.15)"}, # Light Yellow
+                        {'range': [75, 100], 'color': "rgba(40, 167, 69, 0.15)"} # Light Green
+                    ]
                 }
             ))
             fig_gauge = apply_plotly_layout(fig_gauge, "Overall Target Achievement")
@@ -686,20 +753,27 @@ def show():
             
             fig_combo = apply_plotly_layout(fig_combo, "Item Wise: Forecast vs Actual & Achievement %")
             
-            # Secondary Axis (y2) සැකසීම
+            # 🚀 [අලුත් කොටස] Chart එක උඩින් අකුරු කැපෙන එක නවත්වන්න උපරිම අගයන් හොයාගැනීම
+            max_qty = max(req_valid[qty_col].max(), req_valid[fc_col].max())
+            max_ach = req_valid["Ach %"].max()
+            
+            # Secondary Axis (y2) සහ Primary Axis (y) සැකසීම
             fig_combo.update_layout(
                 height=500, 
                 barmode='group', # Side-by-side bars
                 margin=dict(t=60, b=30, l=20, r=40),
-                yaxis=dict(title="Quantity"),
+                yaxis=dict(
+                    title="Quantity",
+                    range=[0, max_qty * 1.15] # increse range
+                ),
                 yaxis2=dict(
-                    # 🚀 මෙතන තමයි වෙනස් වුණේ (titlefont වෙනුවට title ඇතුළෙම font එක දීම)
                     title=dict(text="Achievement %", font=dict(color="#FFB703")),
                     overlaying="y", 
                     side="right",   
                     showgrid=False,
                     tickfont=dict(color="#000000"),
-                    ticksuffix="%"
+                    ticksuffix="%",
+                    range=[0, max_ach * 1.25] # 🚀 ලයින් චාට් එකේ අකුරු වලට උඩින් 25% ක ඉඩක් තැබීම
                 )
             )
             fig_combo.update_xaxes(tickangle=-45)

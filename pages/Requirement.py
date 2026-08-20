@@ -100,9 +100,16 @@ def show():
         ]
         
         working_days_value = 1.0
+        worked_days_value = 1.0 # 🚀 අලුතින් එකතු කළ විචල්‍යය (බිංදුවෙන් බෙදීම වැලැක්වීමට)
+        
         if not working_days_filtered.empty:
             working_days_value = safe_float(working_days_filtered["Working Days"].iloc[0])
             if working_days_value == 0: working_days_value = 1.0
+            
+            # 🚀 Sheet එකෙන් "Worked Days" එක කියවා ගැනීම
+            if "Worked Days" in working_days_filtered.columns:
+                worked_days_value = safe_float(working_days_filtered["Worked Days"].iloc[0])
+                if worked_days_value == 0: worked_days_value = 1.0
 
         date_col = "New_date" if "New_date" in sales_day_book.columns else "new_date" if "new_date" in sales_day_book.columns else "Date"
         if date_col in sales_day_book.columns:
@@ -196,11 +203,13 @@ def show():
         day_target["Day Target"] = day_target["Forecast Qty"] / working_days_value
         day_target = day_target.drop(columns=["Item Name", "Qty", "Forecast Qty"])
 
-        days_in_month = calendar.monthrange(select_date_obj.year, select_date_obj.month)[1]
         average_sales = sale_qty.copy().merge(
             forecast_filtered[["Product Code", "Forecast Qty"]], on="Product Code", how="left"
         )
-        average_sales["Average Sales"] = average_sales["Qty"] / days_in_month
+        
+        # 🚀 කලින් පියවරේදී හොයාගත් 'worked_days_value' එකෙන් බෙදීම
+        average_sales["Average Sales"] = average_sales["Qty"] / worked_days_value
+        
         average_sales = average_sales.drop(columns=["Item Name", "Qty", "Forecast Qty"])
 
         avg_daily_target = sale_qty.copy().merge(
@@ -249,7 +258,7 @@ def show():
             "avg sale per week": "Avg sale per week",
             "avilable balance": "Avilable Balance"
         })
-        
+        master_table = master_table.drop(columns=["Available Qty"], errors="ignore")
         return master_table
 
     # STREAMLIT_CHUNK:Building weekly breakdown...
@@ -622,7 +631,7 @@ def show():
         st.set_page_config(page_title="Requirement Report", layout="wide")
     except:
         pass
-        
+
     st.markdown("""
         <style>
         :root {
@@ -819,7 +828,7 @@ def show():
 
     else:
         st.info("No report exists for the selected date. Click the button below to generate and save one.")
-        if st.button("▶ Calculate & Save Report", type="primary"):
+        if st.button("▶ View Report", type="primary"):
             with st.spinner("Calculating and Saving to Database..."):
                 try:
                     clear_raw_cache()

@@ -264,7 +264,12 @@ def show():
         existing_dict = dict(zip(existing_data_df["Route - Rep Name"], existing_data_df["Issued Qty"]))
         display_df["Issued Qty"] = display_df["Route - Rep Name"].map(existing_dict).fillna(0.0)
 
-    section_banner("1. Upload Raw Export Data")
+    c1, c2 = st.columns([1,1], vertical_alignment="bottom")
+    with c1: section_banner("1. Upload Raw Export Data")
+    with c2:
+        template_csv = base_df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("⬇️ Download Entry Template (CSV)", data=template_csv, file_name=f"Sales_Return_Template_{selected_month_year.replace(' ', '_')}.csv", mime="text/csv", use_container_width=True)
+
     uploaded_file = st.file_uploader("Upload Excel or CSV (Must contain 'Sales Agent' and 'Issued Qty' columns)", type=["csv", "xlsx"])
     
     is_uploaded = False

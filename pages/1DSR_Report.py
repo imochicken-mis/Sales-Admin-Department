@@ -12,7 +12,8 @@ def show():
     # STREAMLIT CHUNK: Rendering the page header...
     st.markdown("<h2 style='text-align: center; color: #03045E; font-weight: 800;'>📥 Daily Sales Report (DSR)</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #0077B6; font-weight: 600;'>Upload and manage daily cash collections based on location.</p>", unsafe_allow_html=True)
-    st.write("")
+    st.write("Welcome, Susen...! This is your private area.")
+    st.write("Here you can enter DSR Report.")
 
     # --- 1. SHEET CONNECTION ---
     # STREAMLIT CHUNK: Connecting to Google Sheets...

@@ -143,6 +143,9 @@ def show():
         ]
         master_table = master_table[cols_order]
         master_table = master_table.replace([np.inf, -np.inf], 0)
+        master_table = master_table.rename(columns={
+            "Day Target 2": "Cumulative Day Target",
+        })
         return master_table
 
     # ============================================================
@@ -674,6 +677,32 @@ def show():
             border: 2px solid #03045E !important;
             box-shadow: 0 0 8px rgba(3, 4, 94, 0.4) !important;
         }
+        /* 🚀 Date Input සහ MultiSelect එකට අදාළ CSS */
+        div[data-testid="stDateInput"] label p, div[data-testid="stMultiSelect"] label p {
+            font-family: 'Arial', sans-serif !important;
+            font-weight: 600 !important;
+            font-size: 16px !important;
+            color: #03045E !important;
+        }
+        div[data-testid="stDateInput"] div[data-baseweb="input"],
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"] {
+            border: 2px solid #0096C7 !important;
+            border-radius: 8px !important;
+            background-color: #F8FDFF !important;
+            transition: all 0.3s ease-in-out;
+            padding-left: 5px;
+        }
+        div[data-testid="stDateInput"] div[data-baseweb="input"]:focus-within,
+        div[data-testid="stMultiSelect"] div[data-baseweb="select"]:focus-within {
+            border: 2px solid #03045E !important;
+            box-shadow: 0 0 8px rgba(3, 4, 94, 0.4) !important;
+        }
+        /* Multiselect ඇතුළේ තෝරන Tags වල පාට */
+        span[data-baseweb="tag"] {
+            background-color: #0096C7 !important;
+            color: white !important;
+            border-radius: 5px !important;
+        }
 
         /* Save and Calculate Buttons Styling */
         button[kind="primary"] {
@@ -767,9 +796,31 @@ def show():
     
     st.title("Rep Sales & Targets Report")
     
-    col1, col2 = st.columns([2, 5], vertical_alignment="bottom")
+    # 🚀 [අලුත්] මුලින්ම Master Data එක Load කරගෙන Managers/Reps ලැයිස්තුව හදාගැනීම
+    master_df, _, _, _ = load_raw_data()
+    all_managers = sorted([str(m) for m in master_df["Manager"].unique() if str(m).strip() and str(m).strip().lower() != "nan"])
+    
+    # 🚀 Date එක සහ Filters එකම පේළියට (Columns 3කට) කඩා ගැනීම
+    col1, col2, col3 = st.columns([1.5, 2, 2.5], vertical_alignment="bottom")
+    
     with col1:
         selected_date = st.date_input("Select Date:", value=datetime.date.today())
+        
+    with col2:
+        # Multiselect විදියට (කිහිප දෙනෙක් තෝරන්න පුළුවන්)
+        selected_managers = st.multiselect("👤 Manager(s):", options=all_managers, placeholder="All Managers")
+        
+    # Manager ෆිල්ටර් එකට අනුව Reps ලැයිස්තුව හැදීම (Manager කෙනෙක් තේරුවොත් එයාගෙ අය විතරයි)
+    if selected_managers:
+        filtered_reps_df = master_df[master_df["Manager"].isin(selected_managers)]
+    else:
+        filtered_reps_df = master_df
+        
+    all_reps = sorted([str(r) for r in filtered_reps_df["Representative"].unique() if str(r).strip() and str(r).strip().lower() != "nan"])
+    
+    with col3:
+        # Multiselect විදියට
+        selected_reps = st.multiselect("🧑‍💼 Representative(s):", options=all_reps, placeholder="All Representatives")
         
     selected_date_str = selected_date.strftime("%Y-%m-%d")
     selected_month_str = pd.to_datetime(selected_date_str).strftime("%Y-%m")
@@ -808,27 +859,39 @@ def show():
 
         st.info("No report exists for the selected date. Click the button below to generate and save one.")
 
-        if st.button("▶ Calculate & Save Report", type="primary"):
+        if st.button("▶ View Report", type="primary"):
             with st.spinner("Calculating and saving to Google Sheet..."):
                 try:
-                    clear_raw_cache()
-                    master_table = build_master_table(selected_date_str)
-                    weekly_table = build_weekly_breakdown(selected_date_str)
+                    # 🚀 [අලුත් කොටස] Sales Day Book එකේ අදාළ දිනට දත්ත තිබේදැයි පරීක්ෂා කිරීම
+                    _, _, sales_df, _ = load_raw_data()
+                    date_col = "New_date" if "New_date" in sales_df.columns else "new_date" if "new_date" in sales_df.columns else "Date"
+                    has_sales = False
+                    
+                    if date_col and not sales_df.empty:
+                        sales_dates = pd.to_datetime(sales_df[date_col], errors="coerce")
+                        has_sales = sales_dates.dt.normalize().eq(pd.Timestamp(selected_date_str)).any()
+                        
+                    if not has_sales:
+                        st.warning(f"⚠️ No data has been entered in the Sales Day Book for {selected_date_str}. Please enter the required data and try generating the report again.")
+                    else:
+                        clear_raw_cache()
+                        master_table = build_master_table(selected_date_str)
+                        weekly_table = build_weekly_breakdown(selected_date_str)
 
-                    sheet2 = get_sheets()
-                    save_report_to_sheet(sheet2, master_table, selected_date_str)
-                    save_weekly_report_to_sheet(sheet2, weekly_table, selected_month_str)
+                        sheet2 = get_sheets()
+                        save_report_to_sheet(sheet2, master_table, selected_date_str)
+                        save_weekly_report_to_sheet(sheet2, weekly_table, selected_month_str)
 
-                    st.session_state["rep_master_table"] = master_table
-                    st.session_state["rep_report_date"] = selected_date_str
-                    st.session_state["rep_weekly_table"] = weekly_table
-                    st.session_state["rep_weekly_month"] = selected_month_str
-                    st.session_state["rep_source"] = "saved"
-                    st.session_state["rep_weekly_source"] = "saved"
+                        st.session_state["rep_master_table"] = master_table
+                        st.session_state["rep_report_date"] = selected_date_str
+                        st.session_state["rep_weekly_table"] = weekly_table
+                        st.session_state["rep_weekly_month"] = selected_month_str
+                        st.session_state["rep_source"] = "saved"
+                        st.session_state["rep_weekly_source"] = "saved"
 
-                    fetch_existing_reports.clear()
-                    st.success(f"Report for '{selected_date_str}' and its weekly breakdown were saved!")
-                    st.rerun()
+                        fetch_existing_reports.clear()
+                        st.success(f"Report for '{selected_date_str}' and its weekly breakdown were saved!")
+                        st.rerun()
                 except Exception as e:
                     st.error(f"Error during calculation/saving: {e}")
 
@@ -837,6 +900,14 @@ def show():
         st.subheader(f"Report for {st.session_state['rep_report_date']}")
         
         report_df = enforce_numeric_types(st.session_state["rep_master_table"])
+        
+        # 🚀 [අලුත්] Multiselect Filters අදාළ කිරීම
+        if selected_managers:
+            report_df = report_df[report_df["Manager"].isin(selected_managers)]
+        if selected_reps:
+            report_df = report_df[report_df["Representative"].isin(selected_reps)]
+
+        # මෙතැනින් පරණ තිබුණු col_f1, col_f2 සෙට් එක සම්පූර්ණයෙන්ම අයින් කරලා තියෙන්නේ
         
         st.markdown("""
         <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px; font-size: 16px; font-weight: 600; color: #03045E; background: white; padding: 12px; border-radius: 6px; border: 1px solid #D1E5EB;">
@@ -893,9 +964,16 @@ def show():
 
         if "rep_weekly_table" in st.session_state:
             weekly_df = enforce_numeric_types(st.session_state["rep_weekly_table"])
+            
+            # 🚀 [අලුත්] Weekly Table එකටත් Filters අදාළ කිරීම
+            if selected_managers:
+                weekly_df = weekly_df[weekly_df["Manager"].isin(selected_managers)]
+            if selected_reps:
+                weekly_df = weekly_df[weekly_df["Representative"].isin(selected_reps)]
+                
             styled_weekly = style_dataframe(weekly_df, is_weekly=True)
             
-            # 🚀 Wrap the Weekly table in HTML Container too
+            # Wrap the Weekly table in HTML Container too
             st.markdown(f"<div class='table-container'>{styled_weekly.to_html()}</div>", unsafe_allow_html=True)
 
             wc1, wc2 = st.columns(2)

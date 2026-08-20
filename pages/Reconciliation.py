@@ -108,6 +108,8 @@ def show():
         filtered_df = filtered_df[filtered_df["Date"].astype(str) == filter_date.strftime('%Y-%m-%d')]
     if filter_route != "All":
         filtered_df = filtered_df[filtered_df["Route"].astype(str) == filter_route]
+    if filter_bank != "All":
+        filtered_df = filtered_df[filtered_df["Type"].astype(str) == filter_bank]
     if filtered_df.empty:
         st.info("No records found for the selected filters.")
         return
