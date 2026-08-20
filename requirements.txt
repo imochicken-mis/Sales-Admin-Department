@@ -12,6 +12,5 @@ google-auth-oauthlib
 google-auth-httplib2
 plotly
 matplotlib
-SQLAlchemy
 psycopg2-binary
 streamlit-aggrid
