@@ -208,12 +208,10 @@ def load_dashboard_data():
         sh1 = connect_to_sheets()
         sh2 = connect_to_sheets2()
         
-        # 🚀 [අලුතින් එකතු කළ කොටස] Error නොපැමිණෙන ලෙස Data Load කිරීම
         def safe_load(ws):
             vals = ws.get_all_values()
             if len(vals) > 1:
                 df = pd.DataFrame(vals[1:], columns=vals[0])
-                # Duplicate columns ඇත්නම් ඉවත් කිරීම
                 df = df.loc[:, ~df.columns.duplicated(keep="first")]
                 return df
             return pd.DataFrame()
@@ -235,28 +233,6 @@ def load_dashboard_data():
         st.error(f"Error loading report data: {e}")
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
-@st.cache_data(ttl=600, show_spinner=False)
-def fetch_dashboard_kpi_raw_data():
-    try:
-        sh1 = connect_to_sheets()
-        sh2 = connect_to_sheets2()
-        
-        # 🚀 [අලුතින් එකතු කළ කොටස]
-        def safe_load(ws):
-            vals = ws.get_all_values()
-            if len(vals) > 1:
-                df = pd.DataFrame(vals[1:], columns=vals[0])
-                df = df.loc[:, ~df.columns.duplicated(keep="first")]
-                return df
-            return pd.DataFrame()
-
-        f_df = safe_load(sh1.worksheet("Forecast"))
-        s_df = safe_load(sh2.worksheet("Sales_day_book"))
-        return f_df, s_df
-    except Exception as e:
-        st.error(f"Error loading KPI raw data: {e}")
-        return pd.DataFrame(), pd.DataFrame()
-
 # Common Layout function to disable zoom/pan scrolling & set styling
 def apply_plotly_layout(fig, title=""):
     fig.update_layout(
@@ -268,7 +244,7 @@ def apply_plotly_layout(fig, title=""):
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         dragmode=False, # Disables mouse drag to zoom/pan
         transition=dict(duration=700, easing="cubic-in-out"),
-        margin=dict(t=60, b=40, l=15, r=15) # 🚀 Increased bottom margin to prevent scrollbars inside iframe
+        margin=dict(t=60, b=40, l=15, r=15) 
     )
     # fixedrange=True disables the internal scrolling of axes
     fig.update_xaxes(showgrid=False, linecolor="#ADE8F4", tickfont=dict(color="#023E8A"), fixedrange=True)
@@ -292,18 +268,17 @@ def render_kpi_cards(total_target, total_sale, daily_avg, expected_days, worked_
         progress = step / steps
         placeholder.markdown(f"""
             <style>
-                /* 🚀 අකුරු පල්ලෙහාට යන එක නවත්වන සහ කාඩ් වල ඉඩ හදන CSS */
                 .kpi-value {{
-                    font-size: 1.9rem !important; /* අකුරු වල සයිස් එක ටිකක් අඩු කළා */
-                    white-space: nowrap !important; /* පල්ලෙහාට කඩන් වැටෙන එක සම්පූර්ණයෙන්ම නවත්වයි */
+                    font-size: 1.9rem !important; 
+                    white-space: nowrap !important; 
                 }}
                 .kg-unit {{
-                    font-size: 1.6rem; /* 'kg' අකුරු ඉලක්කමට වඩා පොඩියට පෙන්වීමට */
+                    font-size: 1.6rem;
                     font-weight: 600;
                     color: #03045e;
                 }}
                 .kpi-card {{
-                    padding: 1.2rem !important; /* කාඩ් 6ම එක පේළියට ගන්න ඇතුලේ ඉඩ (padding) ටිකක් අඩු කළා */
+                    padding: 1.2rem !important;
                 }}
             </style>
             
@@ -342,10 +317,10 @@ def render_kpi_cards(total_target, total_sale, daily_avg, expected_days, worked_
         """, unsafe_allow_html=True)
         if step < steps:
             time.sleep(0.025)
+
 def render_animated_chart(fig, height, animation_kind="default"):
     """Render a Plotly chart without scrollbars, animate smoothly, and replay on click."""
     def as_list(values):
-        """Convert Plotly/Pandas/Numpy values to a list without boolean-testing arrays."""
         return [] if values is None else list(values)
 
     target = json.loads(fig.to_json())
@@ -383,18 +358,12 @@ def render_animated_chart(fig, height, animation_kind="default"):
 
     chart_html = f"""
     <style>
-        /* Cursor එක අතක සලකුණක් වීම (Clickable බව පෙන්වන්න) */
         html, body {{ margin: 0; padding: 0; overflow: hidden; background: transparent; cursor: pointer; }}
-        
         #animated-chart {{ 
-            width: 100%; 
-            height: {height}px; 
-            overflow: hidden; 
+            width: 100%; height: {height}px; overflow: hidden; 
             transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
             border-radius: 12px;
         }}
-        
-        /* Click කළ විට ඇතිවන Highlight Effect එක */
         .chart-clicked {{
             transform: scale(0.98);
             box-shadow: 0px 0px 20px rgba(0, 150, 199, 0.4) inset;
@@ -409,17 +378,12 @@ def render_animated_chart(fig, height, animation_kind="default"):
         const config = {json.dumps(plotly_config)};
         let animTimer = null;
 
-        // Animation එක Play කරන Function එක
         function playAnimation() {{
             if (animTimer) clearInterval(animTimer);
-            
-            // මුලින්ම Chart එක Initial තත්වයට Reset කිරීම
             const initialData = JSON.parse(JSON.stringify(initialRaw.data));
             Plotly.react(chart, initialData, initialRaw.layout, config).then(() => {{
-                
                 const steps = 30;
                 let currentStep = 0;
-                
                 animTimer = setInterval(() => {{
                     currentStep += 1;
                     const progress = currentStep / steps;
@@ -457,22 +421,15 @@ def render_animated_chart(fig, height, animation_kind="default"):
             }});
         }}
 
-        // 1. Dashboard එක Load වෙද්දී මුලින්ම Animation එක දුවන්න
         Plotly.newPlot(chart, JSON.parse(JSON.stringify(initialRaw.data)), initialRaw.layout, config).then(() => {{
             playAnimation();
         }});
 
-        // 2. Chart එක Click කළ විට Event එක
         document.body.addEventListener("click", () => {{
-            // Highlight / Push effect එක එකතු කිරීම
             chart.classList.add("chart-clicked");
-            
-            // මිලි තත්පර 150 කින් ඒ effect එක ඉවත් කිරීම
             setTimeout(() => {{
                 chart.classList.remove("chart-clicked");
             }}, 150);
-            
-            // Animation එක ආයෙමත් මුලේ ඉඳන් Play කිරීම
             playAnimation();
         }});
     </script>
@@ -523,7 +480,7 @@ def show():
         req_df = req_df_all[req_df_all["Date"] == latest_date].copy()
         rep_df = rep_df_all[rep_df_all["Date"] == latest_date].copy()
 
-        # 🚀 CLEAN NUMERIC DATA & FIX "-" & COMMA ERRORS SAFELY
+        # 🚀 CLEAN NUMERIC DATA
         qty_col = next((c for c in ["Sale Qty", "Qty"] if c in req_df.columns), None)
         fc_col = next((c for c in ["Forecast Qty", "Forecast"] if c in req_df.columns), None)
 
@@ -532,107 +489,57 @@ def show():
                 req_df[col] = req_df[col].astype(str).str.replace(',', '', regex=False).replace(r'^\s*-\s*$', '0', regex=True)
                 req_df[col] = pd.to_numeric(req_df[col], errors='coerce').fillna(0)
                 
-        for col in ["Sales", "Target"]:
+        for col in ["Sales", "Target", "Day Target", "Cumulative Day Target", "Day Target 2"]:
             if col in rep_df.columns:
                 rep_df[col] = rep_df[col].astype(str).str.replace(',', '', regex=False).replace(r'^\s*-\s*$', '0', regex=True)
                 rep_df[col] = pd.to_numeric(rep_df[col], errors='coerce').fillna(0)
 
-        # ========================================================
-        # 🚀 ACCURATE KPI CALCULATION LOGIC 
-        # ========================================================
-        forecast_df, sales_df = fetch_dashboard_kpi_raw_data()
 
-        # 1. Calculate Total Target (From "Forecast" sheet)
-        selected_year = str(end_date.year)
-        selected_month_name = end_date.strftime("%B")
-
+        # ========================================================
+        # 🚀 NEW WORKING DAYS LOGIC (Matched with Reports)
+        # ========================================================
+        Expected_Working_Days = 1
         Worked_Days = 1
-        Expected_Working_Days = 1 # 🚀 අලුත් විචල්‍යය
         
-        if not working_days_df.empty and "Year" in working_days_df.columns and "Month" in working_days_df.columns:
-            # Year සහ Month අනුව දත්ත Filter කිරීම
-            wd_filtered = working_days_df[
-                (working_days_df["Year"].astype(str) == selected_year) & 
-                (working_days_df["Month"].astype(str) == selected_month_name)
-            ]
+        if not working_days_df.empty and "Date" in working_days_df.columns:
+            working_days_df["Parsed_Date"] = pd.to_datetime(working_days_df["Date"], errors="coerce").dt.strftime('%Y-%m-%d')
+            wd_filtered = working_days_df[working_days_df["Parsed_Date"] == latest_date.strftime('%Y-%m-%d')]
             
             if not wd_filtered.empty:
-                # 1. Expected Working Days ලබාගැනීම
                 if "Working Days" in wd_filtered.columns:
                     val_exp = wd_filtered["Working Days"].iloc[0]
                     if pd.notna(val_exp) and str(val_exp).strip() != "":
-                        Expected_Working_Days = int(val_exp)
+                        Expected_Working_Days = int(float(val_exp))
                 
-                # 2. Worked Days ලබාගැනීම
                 if "Worked Days" in wd_filtered.columns:
                     val_work = wd_filtered["Worked Days"].iloc[0]
                     if pd.notna(val_work) and str(val_work).strip() != "":
-                        Worked_Days = int(val_work)
-                        if Worked_Days == 0: 
-                            Worked_Days = 1
-           
+                        Worked_Days = int(float(val_work))
 
-        total_target = 0
-        if not forecast_df.empty and "Year" in forecast_df.columns and "Month" in forecast_df.columns:
-            month_forecast = forecast_df[
-                (forecast_df["Year"].astype(str) == selected_year) & 
-                (forecast_df["Month"].astype(str) == selected_month_name)
-            ].copy()
-            if "Forecast Qty" in month_forecast.columns:
-                month_forecast["Forecast Qty"] = pd.to_numeric(
-                    month_forecast["Forecast Qty"].astype(str).str.replace(',', '', regex=False).replace(r'^\s*-\s*$', '0', regex=True), 
-                    errors='coerce'
-                ).fillna(0)
-                total_target = month_forecast["Forecast Qty"].sum()
+        if Expected_Working_Days <= 0: Expected_Working_Days = 1
+        if Worked_Days <= 0: Worked_Days = 1
 
-        # 2. Calculate Total Sale Qty (From 1st of month to selected date)
-        total_sale = 0
-        if not sales_df.empty:
-            date_col = "New_date" if "New_date" in sales_df.columns else "new_date" if "new_date" in sales_df.columns else "Date"
-            if date_col in sales_df.columns:
-                sales_df["Parsed_Date"] = pd.to_datetime(sales_df[date_col], errors="coerce")
-                
-                # Make sure end_date is a proper Timestamp for comparison
-                end_date_ts = pd.Timestamp(end_date)
-                start_date_ts = end_date_ts.replace(day=1)
-                
-                valid_sales = sales_df[
-                    (sales_df["Parsed_Date"] >= start_date_ts) & 
-                    (sales_df["Parsed_Date"] <= end_date_ts)
-                ].copy()
-                
-                if "Qty" in valid_sales.columns:
-                    valid_sales["Qty"] = pd.to_numeric(
-                        valid_sales["Qty"].astype(str).str.replace(',', '', regex=False).replace(r'^\s*-\s*$', '0', regex=True), 
-                        errors='coerce'
-                    ).fillna(0)
-                    total_sale = valid_sales["Qty"].sum()
 
-        Day_target = 0
-        if not rep_df_all.empty and "Date" in rep_df_all.columns:
-            # මාසේ 1 වෙනිදා ඉඳන් තෝරපු දවස වෙනකන් Filter කිරීම
-            valid_rep_data = rep_df_all[
-                (rep_df_all["Date"] >= start_date_ts) & 
-                (rep_df_all["Date"] <= end_date_ts)
-            ].copy()
-            
-            if "Day Target" in valid_rep_data.columns:
-                # කොමා (,) සහ ඉරි (-) අයින් කරලා අගය එකතු කිරීම
-                valid_rep_data["Day Target"] = pd.to_numeric(
-                    valid_rep_data["Day Target"].astype(str).str.replace(',', '', regex=False).replace(r'^\s*-\s*$', '0', regex=True), 
-                    errors='coerce'
-                ).fillna(0)
-                
-                Day_target = valid_rep_data["Day Target"].sum()
+        # ========================================================
+        # 🚀 ACCURATE KPI CALCULATION LOGIC (Using Generated Reports)
+        # ========================================================
+
+        # 1. Calculate Total Target (From Requirement or Rep Report)
+        total_target = req_df[fc_col].sum() if fc_col else (rep_df["Target"].sum() if "Target" in rep_df.columns else 0)
+
+        # 2. Calculate Total Sale Qty (Directly from Rep Report's cumulative Sales column)
+        total_sale = rep_df["Sales"].sum() if "Sales" in rep_df.columns else 0
+
+        # 3. Calculate Cumulative Target
+        day_tgt_col = "Cumulative Day Target" if "Cumulative Day Target" in rep_df.columns else "Day Target 2" if "Day Target 2" in rep_df.columns else None
+        cumulative_target = rep_df[day_tgt_col].sum() if day_tgt_col else (rep_df["Day Target"].sum() * Worked_Days if "Day Target" in rep_df.columns else 0)
         
         overall_ach = (total_sale / total_target * 100) if total_target > 0 else 0
         daily_avg = total_sale / Worked_Days if Worked_Days > 0 else 0
-        variance_to_target = total_sale - Day_target
-
-        active_reps = len(rep_df[rep_df["Sales"] > 0]) if "Sales" in rep_df.columns else 0
+        variance_to_target = total_sale - cumulative_target
 
         # Pass calculated values to KPI Cards
-        render_kpi_cards(total_target, total_sale, daily_avg, Expected_Working_Days, Worked_Days, Day_target, variance_to_target)
+        render_kpi_cards(total_target, total_sale, daily_avg, Expected_Working_Days, Worked_Days, cumulative_target, variance_to_target)
 
         # ================== ROW 1 ==================
         r1c1, r1c2 = st.columns([1, 1])
@@ -640,13 +547,13 @@ def show():
         with r1c1:
             # 🚀 Achievement % එක අනුව Gauge Bar එකේ පාට තීරණය කිරීම
             if overall_ach >= 100:
-                gauge_color = "#28a745"  # Green (ඉලක්කය සපුරා ඇත)
+                gauge_color = "#28a745"  # Green
             elif overall_ach >= 75:
-                gauge_color = "#FFB703"  # Yellow/Orange (ඉලක්කයට ආසන්නයි)
+                gauge_color = "#FFB703"  # Yellow/Orange
             elif overall_ach >= 50:
-                gauge_color = "#F4A261"  # Light Orange (සාමාන්‍යයි)
+                gauge_color = "#F4A261"  # Light Orange
             else:
-                gauge_color = "#D90429"  # Red (අඩුයි)
+                gauge_color = "#D90429"  # Red
 
             # Overall Target Achievement Gauge
             fig_gauge = go.Figure(go.Indicator(
@@ -656,10 +563,9 @@ def show():
                 delta={'reference': 100, 'position': "top", 'font': {'color': "#0077B6"}},
                 gauge={
                     'axis': {'range': [None, max(100, overall_ach)], 'visible': False},
-                    'bar': {'color': gauge_color, 'thickness': 0.8}, # 🚀 මෙතනට dynamic color එක දුන්නා
+                    'bar': {'color': gauge_color, 'thickness': 0.8}, 
                     'bgcolor': "#EAF8FF",
                     'shape': "angular",
-                    # 🚀 (Optional) පිටිපස්සේ Background එකටත් පාට කෑලි 3ක් දැම්මා ලස්සන වෙන්න
                     'steps': [
                         {'range': [0, 50], 'color': "rgba(217, 4, 41, 0.1)"},   # Light Red
                         {'range': [50, 75], 'color': "rgba(255, 183, 3, 0.15)"}, # Light Yellow
@@ -697,51 +603,39 @@ def show():
         if qty_col and fc_col:
             req_valid = req_df[(req_df[qty_col] > 0) | (req_df[fc_col] > 0)].sort_values(qty_col, ascending=False).head(15).copy()
             
-            # අලුතින් එකතු කළ Achievement % ගණනය කිරීම
             req_valid["Ach %"] = np.where(req_valid[fc_col] > 0, (req_valid[qty_col] / req_valid[fc_col]) * 100, 0)
             
             fig_combo = go.Figure()
             
-            # 1. Forecast Qty Bar
             fig_combo.add_trace(go.Bar(
                 x=req_valid["Item Name"], 
                 y=req_valid[fc_col], 
                 name="Forecast", 
                 marker_color="#03045E", 
                 opacity=0.9,
-                text=req_valid[fc_col].apply(lambda x: f"{x/1000:,.0f}k"), # අගයන් format කිරීම
+                text=req_valid[fc_col].apply(lambda x: f"{x/1000:,.0f}k"), 
                 textposition="outside",
-                textfont=dict(
-                    size=13,
-                    family="Arial Black",
-                    color="#03045E"
-                ) 
+                textfont=dict(size=13, family="Arial Black", color="#03045E") 
             ))
             
-            # 2. Actual Sales Bar
             fig_combo.add_trace(go.Bar(
                 x=req_valid["Item Name"], 
                 y=req_valid[qty_col], 
                 name="Actual Sales", 
                 marker_color="#0096C7", 
                 opacity=0.95,
-                text=req_valid[qty_col].apply(lambda x: f"{x/1000:,.0f}k"), # අගයන් format කිරීම
+                text=req_valid[qty_col].apply(lambda x: f"{x/1000:,.0f}k"), 
                 textposition="outside",
-                textfont=dict(
-                    size=13,
-                    family="Arial Black",
-                    color="#0096C7"
-                )
+                textfont=dict(size=13, family="Arial Black", color="#0096C7")
             ))
             
-            # 3. Achievement % Line (Secondary Y-Axis)
             fig_combo.add_trace(go.Scatter(
                 x=req_valid["Item Name"], 
                 y=req_valid["Ach %"], 
                 name="Achievement %", 
                 type="scatter",
                 mode="lines+markers+text", 
-                yaxis="y2", # Secondary axis එකට සම්බන්ධ කිරීම
+                yaxis="y2", 
                 fill="tozeroy", 
                 fillcolor="rgba(255, 183, 3, 0.15)",
                 text=req_valid["Ach %"].apply(lambda x: f"{x:,.1f}%" if x > 0 else ""),
@@ -753,18 +647,16 @@ def show():
             
             fig_combo = apply_plotly_layout(fig_combo, "Item Wise: Forecast vs Actual & Achievement %")
             
-            # 🚀 [අලුත් කොටස] Chart එක උඩින් අකුරු කැපෙන එක නවත්වන්න උපරිම අගයන් හොයාගැනීම
             max_qty = max(req_valid[qty_col].max(), req_valid[fc_col].max())
             max_ach = req_valid["Ach %"].max()
             
-            # Secondary Axis (y2) සහ Primary Axis (y) සැකසීම
             fig_combo.update_layout(
                 height=500, 
-                barmode='group', # Side-by-side bars
+                barmode='group',
                 margin=dict(t=60, b=30, l=20, r=40),
                 yaxis=dict(
                     title="Quantity",
-                    range=[0, max_qty * 1.15] # increse range
+                    range=[0, max_qty * 1.15] 
                 ),
                 yaxis2=dict(
                     title=dict(text="Achievement %", font=dict(color="#FFB703")),
@@ -773,37 +665,26 @@ def show():
                     showgrid=False,
                     tickfont=dict(color="#000000"),
                     ticksuffix="%",
-                    range=[0, max_ach * 1.25] # 🚀 ලයින් චාට් එකේ අකුරු වලට උඩින් 25% ක ඉඩක් තැබීම
+                    range=[0, max_ach * 1.25] 
                 )
             )
             fig_combo.update_xaxes(tickangle=-45)
             st.plotly_chart(fig_combo, use_container_width=True, config=plotly_config)
         else:
             st.info("Qty / Forecast Qty data not available for bar chart.")
-            #render_animated_chart(fig_combo, height=500, animation_kind="line")
-        #else:
-            #st.info("Qty / Forecast Qty data not available for bar chart.")
 
         # ================== ROW 4 ==================
-        #st.markdown("<h4 style='color: #03045E; margin-top: 1rem; font-weight: 800;'>Rep, Dealer, Horreca: Day Target vs Actual Sales</h4>", unsafe_allow_html=True)
         
         required_status_cols = {"Status", "Sales", "Day Target"}
         if required_status_cols.issubset(rep_df.columns):
-            # Error එකක් එන එක වළක්වන්න Day Target තීරුවත් නිවැරදි සංඛ්‍යා (Numbers) බවට පත්කිරීම
-            rep_df["Day Target"] = rep_df["Day Target"].astype(str).str.replace(',', '', regex=False).replace(r'^\s*-\s*$', '0', regex=True)
-            rep_df["Day Target"] = pd.to_numeric(rep_df["Day Target"], errors='coerce').fillna(0)
-
-            # 0 ට වඩා වැඩි දත්ත Filter කර ගැනීම
             status_valid = rep_df[(rep_df["Sales"] > 0) | (rep_df["Day Target"] > 0)].copy()
             status_valid["Status"] = status_valid["Status"].fillna("Unknown").astype(str).str.strip()
             
-            # Status අනුව Sales සහ Day Target එකතු කිරීම (Group by)
             status_grouped = status_valid.groupby("Status")[["Sales", "Day Target"]].sum().reset_index()
-            status_grouped = status_grouped.sort_values("Day Target", ascending=False) # වැඩිම Target එක අනුව පෙළගැස්වීම
+            status_grouped = status_grouped.sort_values("Day Target", ascending=False) 
             
             fig_status = go.Figure()
             
-            # 1. Day Target Bar (තද නිල් පාට - Theme එකට ගැලපෙන ලෙස)
             fig_status.add_trace(go.Bar(
                 x=status_grouped["Status"], 
                 y=status_grouped["Day Target"], 
@@ -812,14 +693,9 @@ def show():
                 opacity=0.9,
                 text=status_grouped["Day Target"].apply(lambda x: f"{x/1000:,.0f}k"),
                 textposition="outside",
-                textfont=dict(
-                    size=14,          # Font size
-                    color="#03045E",    # Font color
-                    family="Arial Black"  # Bold-looking font
-                )
+                textfont=dict(size=14, color="#03045E", family="Arial Black")
             ))
             
-            # 2. Actual Sales Bar (ලා නිල් පාට)
             fig_status.add_trace(go.Bar(
                 x=status_grouped["Status"], 
                 y=status_grouped["Sales"], 
@@ -828,18 +704,14 @@ def show():
                 opacity=0.95,
                 text=status_grouped["Sales"].apply(lambda x: f"{x/1000:,.0f}k"),
                 textposition="outside",
-                textfont=dict(
-                    size=14,          # Font size
-                    color="#00B4D8",    # Font color
-                    family="Arial Black"  # Bold-looking font
-                )
+                textfont=dict(size=14, color="#00B4D8", family="Arial Black")
             ))
             
             fig_status = apply_plotly_layout(fig_status, f"Day Target vs Actual Sales by Representative Status (As of {latest_date.strftime('%Y-%m-%d')})")
             
             fig_status.update_layout(
                 height=500, 
-                barmode='group', # Side-by-side පෙන්වීම
+                barmode='group',
                 margin=dict(t=60, b=30, l=20, r=20),
                 yaxis=dict(title="Amount")
             )
@@ -852,26 +724,14 @@ def show():
         st.markdown(f"<h4 style='color: #03045E; margin-top: 2rem; font-weight: 800;'>🏆 Manager & Representative Performance (As of {latest_date.strftime('%Y-%m-%d')})</h4>", unsafe_allow_html=True)
         
         required_tree_cols = {"Manager", "Representative", "Sales", "Day Target"}
-        if required_tree_cols.issubset(rep_df_all.columns):
-            # තෝරාගත් දින පරාසයේ (Date Range) සියලුම දත්ත ලබාගැනීම
-            tree_date_filtered = rep_df_all[
-                (rep_df_all["Date"].dt.date >= start_date) & 
-                (rep_df_all["Date"].dt.date <= end_date)
-            ].copy()
-            
-            # දත්ත නිවැරදි සංඛ්‍යා බවට පත්කිරීම
-            tree_date_filtered["Day Target"] = pd.to_numeric(tree_date_filtered["Day Target"].astype(str).str.replace(',', '', regex=False).replace(r'^\s*-\s*$', '0', regex=True), errors='coerce').fillna(0)
-            tree_date_filtered["Sales"] = pd.to_numeric(tree_date_filtered["Sales"].astype(str).str.replace(',', '', regex=False).replace(r'^\s*-\s*$', '0', regex=True), errors='coerce').fillna(0)
-
-            # 0 ට වඩා වැඩි දත්ත පමණක් Filter කර ගැනීම
-            tree_valid = tree_date_filtered[(tree_date_filtered["Sales"] > 0) | (tree_date_filtered["Day Target"] > 0)].copy()
+        if required_tree_cols.issubset(rep_df.columns):
+            # 🚀 [අලුත්] Date Range එකක් ඇතුළේ Sum කරනවා වෙනුවට, කෙලින්ම Latest Date Snapshot එක (rep_df) පාවිච්චි කිරීම
+            tree_valid = rep_df[(rep_df["Sales"] > 0) | (rep_df["Day Target"] > 0)].copy()
             
             if not tree_valid.empty:
-                # Manager ගේ සහ Rep ගේ නම් පිරිසිදු කිරීම
                 tree_valid["Manager"] = tree_valid["Manager"].fillna("Unassigned").astype(str).str.strip()
                 tree_valid["Representative"] = tree_valid["Representative"].fillna("Unknown").astype(str).str.strip()
 
-                # Arrays for Custom Treemap
                 ids = []
                 labels = []
                 parents = []
@@ -886,7 +746,6 @@ def show():
                 overall_ach = (total_sales / total_target * 100) if total_target > 0 else 0
 
                 ids.append("All Teams")
-                # 🚀 මෙතන තමයි වෙනස් වුණේ: Label එක ඇතුළෙම අකුරු ලොකු කිරීම
                 labels.append("<span style='font-size: 24px; font-weight: bold;'>All Teams</span>")
                 parents.append("")
                 values.append(0) 
@@ -900,10 +759,9 @@ def show():
                     m_sales = m_df["Sales"].sum()
                     m_ach = (m_sales / m_target * 100) if m_target > 0 else 0
                     
-                    m_id = f"mgr_{manager}" # Unique ID
+                    m_id = f"mgr_{manager}" 
                     
                     ids.append(m_id)
-                    # 🚀 මෙතනත් වෙනස් වුණේ: Manager ගේ නම Label එකෙන්ම ලොකු කිරීම
                     labels.append(f"<span style='font-size: 18px; font-weight: bold;'>{manager}</span>")
                     parents.append("All Teams")
                     values.append(0) 
@@ -920,14 +778,14 @@ def show():
                         r_sales = row["Sales"]
                         r_ach = (r_sales / r_target * 100) if r_target > 0 else 0
                         
-                        r_id = f"rep_{manager}_{rep}" # Unique ID
+                        r_id = f"rep_{manager}_{rep}" 
                         
                         r_size = r_target if r_target > 0 else r_sales
                         if r_size <= 0:
                             r_size = 1 
                             
                         ids.append(r_id)
-                        labels.append(rep) # Rep ගේ නම සාමාන්‍ය ප්‍රමාණයෙන්
+                        labels.append(rep) 
                         parents.append(m_id)
                         values.append(r_size) 
                         colors.append(r_ach)
@@ -935,7 +793,7 @@ def show():
                         texts.append(f"<b>{rep}</b><br>{r_ach:.1f}%")
                         hover_texts.append(f"<b>Rep: {rep}</b> ({manager})<br>Sales: {r_sales:,.0f}<br>Target: {r_target:,.0f}<br>Ach: {r_ach:.1f}%")
 
-                # 4. Create Custom Treemap with Beautiful Blue Theme
+                # 4. Create Custom Treemap
                 fig_tree = go.Figure(go.Treemap(
                     ids=ids,
                     labels=labels,
@@ -948,28 +806,27 @@ def show():
                     hovertemplate="%{customdata}<extra></extra>",
                     marker=dict(
                         colors=colors,
-                        # 🚀 අලංකාර Blue Theme එක (ලා නිල් ඉඳන් තද නිල් දක්වා)
                         colorscale=[[0, '#CAF0F8'], [0.3, '#90E0EF'], [0.7, '#0077B6'], [1.0, '#03045E']],
                         showscale=True,
                         colorbar=dict(title="Ach %", thickness=15),
                         cmin=0,
                         cmax=max(150, max(colors)) if len(colors) > 0 else 150,
-                        line=dict(color='white', width=1.5) # 🚀 කොටු වටේට ලස්සන සුදු පාට බෝඩරයක් 
+                        line=dict(color='white', width=1.5) 
                     ),
                     pathbar=dict(visible=True, textfont=dict(color="#03045E", size=22)),
-                    tiling=dict(packing="squarify", pad=2) # 🚀 කොටු අතර පොඩි ඉඩක් තැබීම
+                    tiling=dict(packing="squarify", pad=2) 
                 ))
                 
                 fig_tree = apply_plotly_layout(fig_tree, f"Hierarchy Performance ({start_date.strftime('%Y-%m-%d')} to {latest_date.strftime('%Y-%m-%d')})")
             
                 fig_tree.update_layout(
-                    height=850, # 🚀 ඉඩ මදි නිසා උස 850 දක්වා ගොඩක් වැඩි කළා
+                    height=850, 
                     margin=dict(t=90, l=10, r=10, b=20)
                 )
                 
                 st.plotly_chart(fig_tree, use_container_width=True, config=plotly_config)
             else:
-                st.info("No sales or target data available for the selected date range.")
+                st.info("No sales or target data available for the selected date.")
         else:
             st.info("Data not available for Treemap.")
 

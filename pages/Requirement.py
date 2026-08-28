@@ -89,27 +89,35 @@ def show():
 
     def build_master_table(selected_date_str: str):
         working_days, sales_day_book, inventory, items_master, forecast = load_raw_data()
-
         select_date_obj = pd.to_datetime(selected_date_str)
         selected_year = select_date_obj.year
         selected_month = select_date_obj.strftime("%B")
 
-        working_days_filtered = working_days[
-            (working_days["Year"].astype(str) == str(selected_year))
-            & (working_days["Month"].astype(str) == str(selected_month))
-        ]
-        
+        # ==========================================================
+        # 🚀 අලුත් ක්‍රමයට Date එකෙන් Working සහ Worked Days ලබා ගැනීම
+        # ==========================================================
         working_days_value = 1.0
-        worked_days_value = 1.0 # 🚀 අලුතින් එකතු කළ විචල්‍යය (බිංදුවෙන් බෙදීම වැලැක්වීමට)
+        worked_days_value = 1.0
         
-        if not working_days_filtered.empty:
-            working_days_value = safe_float(working_days_filtered["Working Days"].iloc[0])
-            if working_days_value == 0: working_days_value = 1.0
+        if not working_days.empty and "Date" in working_days.columns:
+            # Date තීරුව සම්මත YYYY-MM-DD ආකෘතියට හැරවීම (Match කිරීම පහසු වීමට)
+            working_days["Parsed_Date"] = pd.to_datetime(working_days["Date"], errors="coerce").dt.strftime('%Y-%m-%d')
             
-            # 🚀 Sheet එකෙන් "Worked Days" එක කියවා ගැනීම
-            if "Worked Days" in working_days_filtered.columns:
-                worked_days_value = safe_float(working_days_filtered["Worked Days"].iloc[0])
-                if worked_days_value == 0: worked_days_value = 1.0
+            # Select කරපු දිනයට (selected_date_str) හරියටම ගැලපෙන පේළිය සෙවීම
+            wd_filtered = working_days[working_days["Parsed_Date"] == selected_date_str]
+            
+            if not wd_filtered.empty:
+                # 1. Working Days ලබා ගැනීම
+                if "Working Days" in wd_filtered.columns:
+                    val_working = safe_float(wd_filtered["Working Days"].iloc[0])
+                    if val_working > 0: 
+                        working_days_value = val_working
+                
+                # 2. Worked Days ලබා ගැනීම
+                if "Worked Days" in wd_filtered.columns:
+                    val_worked = safe_float(wd_filtered["Worked Days"].iloc[0])
+                    if val_worked > 0: 
+                        worked_days_value = val_worked
 
         date_col = "New_date" if "New_date" in sales_day_book.columns else "new_date" if "new_date" in sales_day_book.columns else "Date"
         if date_col in sales_day_book.columns:
@@ -128,7 +136,8 @@ def show():
 
         forecast_filtered = forecast[
             (forecast["Year"].astype(str) == str(selected_year)) & (forecast["Month"].astype(str) == str(selected_month))
-        ].copy()
+        ].copy() if ("Year" in forecast.columns and "Month" in forecast.columns) else forecast.copy()
+        
         if "Forecast Qty" in forecast_filtered.columns:
             forecast_filtered["Forecast Qty"] = forecast_filtered["Forecast Qty"].apply(safe_float)
 
@@ -209,7 +218,6 @@ def show():
         
         # 🚀 කලින් පියවරේදී හොයාගත් 'worked_days_value' එකෙන් බෙදීම
         average_sales["Average Sales"] = average_sales["Qty"] / worked_days_value
-        
         average_sales = average_sales.drop(columns=["Item Name", "Qty", "Forecast Qty"])
 
         avg_daily_target = sale_qty.copy().merge(
@@ -349,7 +357,6 @@ def show():
             def highlight_rows(row):
                 styles = [''] * len(row)
                 
-                # 🚀 Changed from 'forecast_achivement %' to 'Forecast Achievement %'
                 if 'Forecast Achievement %' in row.index:
                     ach_idx = row.index.get_loc('Forecast Achievement %')
                     ach_val = safe_get_float(row['Forecast Achievement %'])
@@ -377,7 +384,6 @@ def show():
                         if bal_val >= 0: styles[bal_idx] = 'background-color: #E2F0CB !important; color: #2D5A27 !important; font-weight: bold;'
                         else: styles[bal_idx] = 'background-color: #FFD1D1 !important; color: #900000 !important; font-weight: bold;'
                 
-                # 🚀 Changed from 'Qty' to 'Sale Qty'
                 if 'Sale Qty' in row.index and 'Forecast Qty' in row.index:
                     qty_idx = row.index.get_loc('Sale Qty')
                     qty_val = safe_get_float(row['Sale Qty'])

@@ -8,7 +8,7 @@ from google.oauth2.service_account import Credentials
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-@st.cache_data(ttl=600, show_spinner=False)
+@st.cache_data(ttl=60000, show_spinner=False)
 def get_users_from_sheet():
     try:
         # ඔයාගේ Sheet connection function එක මෙතනට දෙන්න (උදා: connect_to_sheets)
@@ -42,7 +42,7 @@ def authenticate(username, password):
 
 def get_allowed_pages(role):
     if role == "admin":
-        return ["Requirement", "dashboard","rep_target","2Cash_Collection_and_Deposit_Report","dashboard_2","Variance_Report"]
+        return ["KPI","Requirement", "dashboard","rep_target","2Cash_Collection_and_Deposit_Report","dashboard_2","Variance_Report"]
     if role in ["user1"]:
         return ["3Monthly_Forecast","4Working_days","5Rep_Target", "1sales_day_book","2Inventory"]
     if role in ["user2"]:
@@ -51,6 +51,10 @@ def get_allowed_pages(role):
         return ["1Age_Receivable"]
     if role in ["user4"]:
             return ["Issued_Qty","Rep_Variance","Sales_Return","Shop_Return"]
+    if role in ["user5"]:
+        return ["Vehicle_Data"]
+    if role in ["user6"]:
+        return ["Invoice_Cancellation","Receipt_Cancellation"]
     if role in ["admin1"]:
             return ["Settings"]
     if role in ["KpiAdmin"]:

@@ -352,8 +352,8 @@ def main():
         st.session_state.username = st.session_state.pending_username
         st.session_state.role = st.session_state.pending_role
         allowed_pages = get_allowed_pages(st.session_state.role)
-        if "Requirement" in allowed_pages:
-            st.session_state.current_page = "Requirement"
+        if "KPI" in allowed_pages:
+            st.session_state.current_page = "KPI"
         else:
             st.session_state.current_page = allowed_pages[0] if allowed_pages else "dashboard" # or any fallback
 
@@ -532,7 +532,7 @@ def main():
         return clean_name.replace("_", " ").title()
     
     kpi_pages = [p for p in page_options if p in ["KPI"]]
-    data_entry_pages = [p for p in page_options if p in ["1sales_day_book" , "2Inventory", "3Monthly_Forecast", "4Working_days", "5Rep_Target","1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation","1Age_Receivable","Issued_Qty","Rep_Variance","Sales_Return","Shop_Return"]]
+    data_entry_pages = [p for p in page_options if p in ["1sales_day_book" , "2Inventory", "3Monthly_Forecast", "4Working_days", "5Rep_Target","1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation","1Age_Receivable","Issued_Qty","Rep_Variance","Sales_Return","Shop_Return","Vehicle_Data","Invoice_Cancellation","Receipt_Cancellation"]]
     report_pages = [p for p in page_options if p in ["Requirement", "rep_target","2Cash_Collection_and_Deposit_Report","Variance_Report"]]
     dashboard_pages = [p for p in page_options if p in ["dashboard","dashboard_2"]]
     settings_pages = [p for p in page_options if p in ["Settings"]]
