@@ -481,6 +481,21 @@ def main():
             padding-bottom: 10px;
             margin-top: -10px;
         }
+        /* 🚀 Logout Button Custom Styling */
+        [data-testid="stSidebar"] .stButton > button {
+            background-color: #D90429 !important; /* Button එකේ පසුබිම් වර්ණය (Red) */
+            color: white !important; /* අකුරුවල වර්ණය */
+            border: none !important;
+            border-radius: 8px !important;
+            font-weight: bold !important;
+            transition: 0.3s ease-in-out;
+        }
+
+        [data-testid="stSidebar"] .stButton > button:hover {
+            background-color: #a3001b !important; /* Hover කරද්දී පෙන්වන වර්ණය */
+            box-shadow: 0 4px 12px rgba(217, 4, 41, 0.4) !important;
+        }
+
         </style>
     """, unsafe_allow_html=True)
 

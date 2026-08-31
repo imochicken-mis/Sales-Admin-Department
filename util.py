@@ -13,7 +13,8 @@ USERS = {
     "user2": {"password_hash": hash_password("pass2"), "role": "user2"},
     "user3": {"password_hash": hash_password("pass3"), "role": "user3"},
     "user4": {"password_hash": hash_password("pass4"), "role": "user4"},
-    "user5": {"password_hash": hash_password("pass4"), "role": "user5"},
+    "user5": {"password_hash": hash_password("pass5"), "role": "user5"},
+    "user6": {"password_hash": hash_password("pass6"), "role": "user6"},
     "admin": {"password_hash": hash_password("adminpass"), "role": "admin"},
     "admin1": {"password_hash": hash_password("adminpass1"), "role": "admin1"}
 }
