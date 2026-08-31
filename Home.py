@@ -483,8 +483,8 @@ def main():
         }
         /* 🚀 Logout Button Custom Styling */
         [data-testid="stSidebar"] .stButton > button {
-            background-color: #D90429 !important; /* Button එකේ පසුබිම් වර්ණය (Red) */
-            color: white !important; /* අකුරුවල වර්ණය */
+            background-color: #d8e4e7 !important; /* Button එකේ පසුබිම් වර්ණය */
+            color: black !important; /* අකුරුවල වර්ණය */
             border: none !important;
             border-radius: 8px !important;
             font-weight: bold !important;
@@ -492,8 +492,8 @@ def main():
         }
 
         [data-testid="stSidebar"] .stButton > button:hover {
-            background-color: #a3001b !important; /* Hover කරද්දී පෙන්වන වර්ණය */
-            box-shadow: 0 4px 12px rgba(217, 4, 41, 0.4) !important;
+            background-color: #9ba3a6 !important; /* Hover කරද්දී පෙන්වන වර්ණය */
+            box-shadow: 0 4px 12px rgba(95,100,101, 0.4) !important;
         }
 
         </style>
