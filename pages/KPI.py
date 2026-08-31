@@ -8,7 +8,7 @@ def show():
     st.markdown("""
         <style>
             .block-container {
-                padding-top: 3.5rem !important;
+                padding-top: 3.5rem !important; 
                 padding-bottom: 0rem !important;
                 padding-left: 1rem !important;
                 padding-right: 1rem !important;
