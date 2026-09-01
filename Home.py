@@ -541,6 +541,8 @@ def main():
             return "DSR Report"
         if name == "dashboard_2":
             return "Cash Collection"
+        if name == "KPI":
+            return "KPI"
 
         # clear the unusefull 
         clean_name = re.sub(r'^[\d_]+', '', name)
