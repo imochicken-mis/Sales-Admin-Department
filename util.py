@@ -14,7 +14,7 @@ USERS = {
     "user3": {"password_hash": hash_password("pass3"), "role": "user3"},
     "user4": {"password_hash": hash_password("pass4"), "role": "user4"},
     "user5": {"password_hash": hash_password("pass5"), "role": "user5"},
-    "user6": {"password_hash": hash_password("pass6"), "role": "user6"},
+    #"user6": {"password_hash": hash_password("pass6"), "role": "user6"},
     "admin": {"password_hash": hash_password("adminpass"), "role": "admin"},
     "admin1": {"password_hash": hash_password("adminpass1"), "role": "admin1"}
 }
@@ -32,13 +32,13 @@ def get_allowed_pages(role):
         return ["3Monthly_Forecast","4Working_days","5Rep_Target", "1sales_day_book","2Inventory"]
     if role in ["user2"]:
         return ["1DSR_Report","2Cash_Collection_and_Deposit","Reconciliation"]
+    #if role in ["user3"]:
+    #    return ["1Age_Receivable"]
     if role in ["user3"]:
-        return ["1Age_Receivable"]
-    if role in ["user4"]:
             return ["Issued_Qty","Rep_Variance","Sales_Return","Shop_Return"]
-    if role in ["user5"]:
+    if role in ["user4"]:
         return ["Vehicle_Data"]
-    if role in ["user6"]:
+    if role in ["user5"]:
         return ["Invoice_Cancellation","Receipt_Cancellation"]
     if role in ["admin1"]:
             return ["Settings"]
