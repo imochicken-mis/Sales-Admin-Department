@@ -530,10 +530,9 @@ def show():
         # 2. Calculate Total Sale Qty (Directly from Rep Report's cumulative Sales column)
         total_sale = rep_df["Sales"].sum() if "Sales" in rep_df.columns else 0
 
-        # 3. Calculate Cumulative Target
-        day_tgt_col = "Cumulative Day Target" if "Cumulative Day Target" in rep_df.columns else "Day Target 2" if "Day Target 2" in rep_df.columns else None
-        cumulative_target = rep_df[day_tgt_col].sum() if day_tgt_col else (rep_df["Day Target"].sum() * Worked_Days if "Day Target" in rep_df.columns else 0)
-        
+        # 3. Calculate Cumulative Target (🚀 KPI එක සඳහා පමණක් හැමවිටම Day Target * Worked_Days ලෙස ගණනය කිරීම)
+        cumulative_target = (rep_df["Day Target"].sum() * Worked_Days) if "Day Target" in rep_df.columns else 0
+
         overall_ach = (total_sale / total_target * 100) if total_target > 0 else 0
         daily_avg = total_sale / Worked_Days if Worked_Days > 0 else 0
         variance_to_target = total_sale - cumulative_target
@@ -678,6 +677,10 @@ def show():
         required_status_cols = {"Status", "Sales", "Day Target"}
         if required_status_cols.issubset(rep_df.columns):
             status_valid = rep_df[(rep_df["Sales"] > 0) | (rep_df["Day Target"] > 0)].copy()
+            
+            # 🚀 Day Target එක Worked Days වලින් ගුණ කිරීම
+            status_valid["Day Target"] = status_valid["Day Target"] * Worked_Days
+            
             status_valid["Status"] = status_valid["Status"].fillna("Unknown").astype(str).str.strip()
             
             status_grouped = status_valid.groupby("Status")[["Sales", "Day Target"]].sum().reset_index()
@@ -707,7 +710,7 @@ def show():
                 textfont=dict(size=14, color="#00B4D8", family="Arial Black")
             ))
             
-            fig_status = apply_plotly_layout(fig_status, f"Day Target vs Actual Sales by Representative Status (As of {latest_date.strftime('%Y-%m-%d')})")
+            fig_status = apply_plotly_layout(fig_status, f"Cumulative Target vs Actual Sales by Representative Status (As of {latest_date.strftime('%Y-%m-%d')})")
             
             fig_status.update_layout(
                 height=500, 
@@ -725,12 +728,14 @@ def show():
         
         required_tree_cols = {"Manager", "Representative", "Sales", "Day Target"}
         if required_tree_cols.issubset(rep_df.columns):
-            # 🚀 [අලුත්] Date Range එකක් ඇතුළේ Sum කරනවා වෙනුවට, කෙලින්ම Latest Date Snapshot එක (rep_df) පාවිච්චි කිරීම
+            # 🚀 [අලුත්] Date Range එකක් ඇතුළේ Sum කරනවා වෙනුවට...
             tree_valid = rep_df[(rep_df["Sales"] > 0) | (rep_df["Day Target"] > 0)].copy()
             
             if not tree_valid.empty:
+                # 🚀 Day Target එක Worked Days වලින් ගුණ කිරීම
+                tree_valid["Day Target"] = tree_valid["Day Target"] * Worked_Days
+                
                 tree_valid["Manager"] = tree_valid["Manager"].fillna("Unassigned").astype(str).str.strip()
-                tree_valid["Representative"] = tree_valid["Representative"].fillna("Unknown").astype(str).str.strip()
 
                 ids = []
                 labels = []

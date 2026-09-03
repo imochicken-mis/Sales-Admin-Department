@@ -576,26 +576,20 @@ def show():
             opacity=0.85,
             # 🚀 1. Column එක ඇතුළට Data Label එක දැමීම (සුදු පාටින්)
             text=rep_perf[tot_col_name].apply(lambda x: f"{x/1000:,.0f}k" if x > 0 else ""),
-            textposition="inside",
+            textposition="outside", # Label එක Column එකට උඩින් පෙන්වීමට
             insidetextanchor="start",
-            textfont=dict(color="white", size=12, family="Arial Black")
+            textfont=dict(color="#0077B6", size=12, family="Arial Black")
         ))
         
-        fig_rep.add_trace(go.Scatter(
+        fig_rep.add_trace(go.Bar(
             x=rep_perf['Route'],
             y=rep_perf['Amount'],
             name='Total Deposited',
-            type='scatter',
-            mode='lines+markers+text',
-            # 🚀 Line එක යටින් ලා පාට Area එකක් පිරවීම සඳහා අලුතින් එක් කළ කොටස
-            fill='tozeroy', 
-            fillcolor='rgba(255, 183, 3, 0.15)',
+            marker_color='#1c1d6e', 
+            opacity=0.9,
             text=rep_perf['Amount'].apply(lambda x: f"{x/1000:,.0f}k" if x > 0 else ""),
-            # 🚀 2. Line එක උඩට Data Label එක දැමීම (Line එකේ පාටින්ම)
-            textposition="top center",
-            textfont=dict(color="#FFB703", size=13, family="Arial Black"),
-            line=dict(shape='spline', color='#FFB703', width=3), 
-            marker=dict(size=8, color='#FFB703', line=dict(width=2, color='white'))
+            textposition="outside", # Label එක Column එකට උඩින් පෙන්වීමට
+            textfont=dict(color="#1c1d6e", size=12, family="Arial Black")
         ))
         
         fig_rep = apply_plotly_layout(fig_rep, "Rep Wise: Cash Collection vs Deposits (All Reps)")
