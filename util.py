@@ -9,11 +9,11 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 USERS = {
-    "user1": {"password_hash": hash_password("pass1"), "role": "user1"},
-    "user2": {"password_hash": hash_password("pass2"), "role": "user2"},
-    "user3": {"password_hash": hash_password("pass3"), "role": "user3"},
-    "user4": {"password_hash": hash_password("pass4"), "role": "user4"},
-    "user5": {"password_hash": hash_password("pass5"), "role": "user5"},
+    "Pradeep": {"password_hash": hash_password("pradeep123"), "role": "user1"},
+    "Susen": {"password_hash": hash_password("susen123"), "role": "user2"},
+    "Yasindu": {"password_hash": hash_password("yasindu123"), "role": "user3"},
+    "Ishara": {"password_hash": hash_password("ishara123"), "role": "user4"},
+    "Kavishka": {"password_hash": hash_password("kavishka123"), "role": "user5"},
     #"user6": {"password_hash": hash_password("pass6"), "role": "user6"},
     "admin": {"password_hash": hash_password("adminpass"), "role": "admin"},
     "admin1": {"password_hash": hash_password("adminpass1"), "role": "admin1"}
