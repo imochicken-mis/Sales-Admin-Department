@@ -1,3 +1,0 @@
-fastapi
-gspread
-oauth2client
